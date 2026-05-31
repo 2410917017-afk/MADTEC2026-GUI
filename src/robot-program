@@ -1,0 +1,23 @@
+MODULE MainModule
+    ! Variables globales
+    CONST robtarget pHome := [[...], [...], [...], [...]];
+    VAR num contador := 0;
+    
+    PROC main()
+        WaitDI "DI", 1 \MaxTime:=10 \TimeFlag:=bTimeout;
+        IF bTimeout THEN RAISE ERR_TIMEOUT; ENDIF
+
+        MoveJ pHome, v10, z10, tool0;
+        MoveL "";
+        PulseDO \PLength:=0.5, "DO"; ! pulso de 0.5 s
+
+        WaitDI "DI2", 1 \MaxTime:=10 \TimeFlag:=bTimeout;
+        IF bTimeout THEN RAISE ERR_TIMEOUT; ENDIF
+
+        MoveL "";
+        MoveL pHome, v10, z10, tool0;
+        PulseDO \PLength:=0.5, "DO2"; ! pulso de 0.5 s
+
+    ENDPROC
+    
+ENDMODULE
