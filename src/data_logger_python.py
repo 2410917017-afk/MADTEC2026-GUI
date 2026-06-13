@@ -1,3 +1,9 @@
+# Código para la adquisición de datos preliminar en la validación de la instrumentación del proceso de soldadura por puntos.
+# Incluye interfaz gráfica simple para el muestreo y graficación de datos, así como guardar las gráficas en una carpeta dedicada.
+# Comandos para instalara librerías requeridas, contando ya con Python (usamos versión 3.14):
+
+# pip install matplotlib, pip install python-snap7, pip install pyqt6
+
 import sys, matplotlib.pyplot as plt
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -9,17 +15,17 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import  QFont
 from datetime import datetime
 
-
+# Inicialización de interfaz gráfica
 class HMI(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("PLC Plotter")
+        self.setWindowTitle("PLC Plotter") # Configuración de la ventana de la GUI
         self.setFixedSize(1300, 600)
         self.setStyleSheet("background-color: #001b1b")
 
-        main_layout = QGridLayout(self)
+        main_layout = QGridLayout(self) # Distribución de rejilla, renglones y columnas
 
-        self.connected = False
+        self.connected = False # Declaración de variables utilizadas
         self.texto = 0
         self.index = 0
         self.nombre = ""
@@ -27,16 +33,16 @@ class HMI(QWidget):
         self.max = 0
         self.presion = 0
 
-        self.plc = snap7.client.Client()
+        self.plc = snap7.client.Client() # Creación de objeto para comunicación con PLC Siemens S7-1200
 
-        self.figure = Figure(figsize=(6, 6), dpi=100)
+        self.figure = Figure(figsize=(6, 6), dpi=100) # Creación de espacio para graficar datos adquiridos del PLC
         self.canvas = FigureCanvas(self.figure)
 
         self.figure2 = Figure(figsize=(6, 6), dpi=100)
         self.canvas2 = FigureCanvas(self.figure2)
         
 
-        self.buttonstart = QPushButton("Start")
+        self.buttonstart = QPushButton("Start") # Creación y configuración de elementos incluidos en la GUI
         self.buttonstart.setFont(QFont("Arial", 28))
         self.buttonstart.setFixedSize(115, 115)
         self.buttonstart.setStyleSheet("""
@@ -53,7 +59,7 @@ class HMI(QWidget):
                                   padding: 11px 9px 9px 11px;
                                   }
                                   """)
-        self.buttonstart.clicked.connect(self.actualizar_nombre)
+        self.buttonstart.clicked.connect(self.actualizar_nombre) # Llamada a funciones que ejecutan el comportamiento de botones
         self.buttonstart.clicked.connect(self.showplot)
         
 
@@ -96,7 +102,7 @@ class HMI(QWidget):
                                   """)
         self.buttonset.clicked.connect(self.setSamples)
         
-        self.samplesEdit = QLineEdit()
+        self.samplesEdit = QLineEdit() # Bloque de edición para definición de número de muestras a recopilar
         self.samplesEdit.setPlaceholderText("N. of samples...")
         self.samplesEdit.setFont(QFont("Arial", 18))
         self.samplesEdit.setFixedSize(200, 70)
@@ -104,7 +110,7 @@ class HMI(QWidget):
         self.samplesEdit.textChanged.connect(self.updatesamp)
 
     
-        main_layout.addWidget(self.buttonstart, 1, 0)
+        main_layout.addWidget(self.buttonstart, 1, 0) # Agregado de widgets y elementos a distribución principal de la ventana
         main_layout.addWidget(self.buttonconnect, 1, 1)
         main_layout.addWidget(self.samplesEdit, 1, 2)
         main_layout.addWidget(self.canvas, 0,  0, 1, 2)
@@ -112,13 +118,7 @@ class HMI(QWidget):
         main_layout.addWidget(self.buttonset, 1, 3)
 
 
-    def updatesamp(self, text):
-        if text != "":
-            num = text
-            self.texto = int(num)
-
-
-    def write_int(self, db_number, byte_offset, value: int):
+    def write_int(self, db_number, byte_offset, value: int): # Funciones para comunicación GUI <-> PLC
         data = bytearray(2)
         set_int(data, 0, value)
         self.plc.db_write(db_number, byte_offset, data)
@@ -174,7 +174,7 @@ class HMI(QWidget):
         self.plc.db_write(db, byte_offset, data)
 
 
-    def connectPLC(self):
+    def connectPLC(self): # Función para establecer conexión
         try:
             
             self.plc.disconnect()
@@ -189,6 +189,13 @@ class HMI(QWidget):
             print(f"Error: {e}")
 
 
+    def updatesamp(self, text): # Funciones para comportamiento de botones y conexión a PLC
+        
+        if text != "":
+            num = text
+            self.texto = int(num)
+
+
     def setSamples(self):
         try:
             num = self.texto
@@ -196,13 +203,18 @@ class HMI(QWidget):
 
         except Exception as e:
             print(f"Error: {e}")
+            
 
-    def actualizar_nombre(self):
+    def actualizar_nombre(self): # Función para actualizar nombre de gráfica a guardar
         self.index = int(self.index) 
         self.index = self.index + 1
         self.index = str(self.index)
+        ahora = datetime.now()
+        
+        fecha_formateada = ahora.strftime("%d-%m-%Y")
+        fecha_formateada = str(fecha_formateada)
 
-        self.nombre = "Plots/grafica_" + self.index
+        self.nombre = "Plots/grafica_" + self.index + "_" + fecha_formateada
 
 
     def showplot(self):
