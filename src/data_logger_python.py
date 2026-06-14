@@ -4,36 +4,70 @@
 
 # pip install matplotlib, pip install python-snap7, pip install pyqt6
 
-import sys, matplotlib.pyplot as plt
+import gspread
+from google.oauth2.service_account import Credentials
+
+import sys, matplotlib.pyplot as plt, os, snap7
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-import snap7
 from snap7.util import get_int, get_real, get_bool, set_int, set_bool, get_dword
 from PyQt6.QtWidgets import (
-    QApplication, QWidget, QGridLayout, QPushButton, QLineEdit
+    QApplication, QWidget, QGridLayout, QPushButton, QLineEdit, QLabel, QGroupBox, QMessageBox
 )
 from PyQt6.QtGui import  QFont
 from datetime import datetime
+from openpyxl import load_workbook, Workbook
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
 
 # Inicialización de interfaz gráfica
 class HMI(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("PLC Plotter") # Configuración de la ventana de la GUI
-        self.setFixedSize(1300, 600)
+        #self.setFixedSize(1300, 600)
         self.setStyleSheet("background-color: #001b1b")
 
         main_layout = QGridLayout(self) # Distribución de rejilla, renglones y columnas
+        main_layout.setContentsMargins(10, 10, 10, 10)
+        param_layout = QGridLayout()
+        param_layout.setContentsMargins(10, 20, 10, 20)
+
+        ahora = datetime.now()
+        
+        self.fecha_formateada = ahora.strftime("%d-%m-%Y")
+        self.fecha_formateada = str(self.fecha_formateada)
+
+        # Alcances necesarios para leer/escribir en Google Sheets
+        self.SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+
+        # Ruta al archivo de credenciales JSON
+        self.SERVICE_ACCOUNT_FILE = "imposing-eye-463014-c6-dc68c49329ea.json"
+
+        # ID de la hoja de cálculo (lo obtienes de la URL de Google Sheets)
+        self.SPREADSHEET_ID = "1lXYWTcKbLMyeU1un209UrB6Grzs2deBy58QLIhDxg70"
+
+        # Nombre de la pestaña dentro de la hoja
+        self.WORKSHEET_NAME = "Hoja 1"
 
         self.connected = False # Declaración de variables utilizadas
         self.texto = 0
         self.index = 0
         self.nombre = ""
         self.tSoldadura = 0
-        self.max = 0
-        self.presion = 0
+        self.max = 0.0
+        self.mat1 = 0
+        self.mat2 = ""
+        self.mat3 = ""
+        self.data_row = []
 
         self.plc = snap7.client.Client() # Creación de objeto para comunicación con PLC Siemens S7-1200
+
+
+        self.paramGroup = QGroupBox("Parameters")
+        self.paramGroup.setFixedWidth(300)
+        self.paramGroup.setStyleSheet("background-color: dimgrey; color: whitesmoke; border-radius: 10px")
+        self.paramGroup.setFont(QFont("Arial", 16))
 
         self.figure = Figure(figsize=(6, 6), dpi=100) # Creación de espacio para graficar datos adquiridos del PLC
         self.canvas = FigureCanvas(self.figure)
@@ -69,7 +103,7 @@ class HMI(QWidget):
         self.buttonconnect.setFixedSize(200, 80)
         self.buttonconnect.setStyleSheet("""
                                   QPushButton {
-                                  background-color: darkslategrey; 
+                                  background-color: dimgrey; 
                                   color: silver; border: none; 
                                   border-radius: 20px; 
                                   padding: 10px 10px
@@ -101,7 +135,60 @@ class HMI(QWidget):
                                   }
                                   """)
         self.buttonset.clicked.connect(self.setSamples)
+
+        self.buttonload = QPushButton("Load data")
+        self.buttonload.setFont(QFont("Arial", 28))
+        self.buttonload.setFixedSize(180, 80)
+        self.buttonload.setStyleSheet("""
+                                  QPushButton {
+                                  background-color: darkslategrey; 
+                                  color: silver; border: none; 
+                                  border-radius: 20px; 
+                                  padding: 10px 10px
+                                  }
+                                  QPushButton:hover {
+                                  background-color: darkgrey;
+                                  }
+                                  QPushButton:pressed {
+                                  padding: 11px 9px 9px 11px;
+                                  }
+                                  """)
+        self.buttonload.clicked.connect(self.log_to_google_sheets)
+        self.buttonload.clicked.connect(self.generar_pdf)
         
+        self.label1 = QLabel("Material thickness [mm]")
+        self.label1.setFont(QFont("Arial", 18))
+        self.label1.setStyleSheet("color: whitesmoke")
+
+        self.mat1Edit = QLineEdit() # Bloque de edición para definición de número de muestras a recopilar
+        self.mat1Edit.setPlaceholderText("...")
+        self.mat1Edit.setFont(QFont("Arial", 16))
+        self.mat1Edit.setFixedSize(200, 60)
+        self.mat1Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.mat1Edit.textChanged.connect(self.mat1update)
+
+        self.label2 = QLabel("Material type")
+        self.label2.setFont(QFont("Arial", 18))
+        self.label2.setStyleSheet("color: whitesmoke")
+
+        self.mat2Edit = QLineEdit() # Bloque de edición para definición de número de muestras a recopilar
+        self.mat2Edit.setPlaceholderText("...")
+        self.mat2Edit.setFont(QFont("Arial", 16))
+        self.mat2Edit.setFixedSize(200, 60)
+        self.mat2Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.mat2Edit.textChanged.connect(self.mat2update)
+
+        self.label3 = QLabel("Nugget diameter [mm]")
+        self.label3.setFont(QFont("Arial", 18))
+        self.label3.setStyleSheet("color: whitesmoke")
+
+        self.mat3Edit = QLineEdit() # Bloque de edición para definición de número de muestras a recopilar
+        self.mat3Edit.setPlaceholderText("...")
+        self.mat3Edit.setFont(QFont("Arial", 16))
+        self.mat3Edit.setFixedSize(200, 60)
+        self.mat3Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.mat3Edit.textChanged.connect(self.mat3update)
+
         self.samplesEdit = QLineEdit() # Bloque de edición para definición de número de muestras a recopilar
         self.samplesEdit.setPlaceholderText("N. of samples...")
         self.samplesEdit.setFont(QFont("Arial", 18))
@@ -109,6 +196,14 @@ class HMI(QWidget):
         self.samplesEdit.setStyleSheet("color: ghostwhite")
         self.samplesEdit.textChanged.connect(self.updatesamp)
 
+        param_layout.addWidget(self.label1)
+        param_layout.addWidget(self.mat1Edit)
+        param_layout.addWidget(self.label2)
+        param_layout.addWidget(self.mat2Edit)
+        param_layout.addWidget(self.label3)
+        param_layout.addWidget(self.mat3Edit)
+
+        self.paramGroup.setLayout(param_layout)
     
         main_layout.addWidget(self.buttonstart, 1, 0) # Agregado de widgets y elementos a distribución principal de la ventana
         main_layout.addWidget(self.buttonconnect, 1, 1)
@@ -116,6 +211,8 @@ class HMI(QWidget):
         main_layout.addWidget(self.canvas, 0,  0, 1, 2)
         main_layout.addWidget(self.canvas2, 0,  2, 1, 2) 
         main_layout.addWidget(self.buttonset, 1, 3)
+        main_layout.addWidget(self.paramGroup, 0, 5)
+        main_layout.addWidget(self.buttonload, 1, 5)
 
 
     def write_int(self, db_number, byte_offset, value: int): # Funciones para comunicación GUI <-> PLC
@@ -180,42 +277,125 @@ class HMI(QWidget):
             self.plc.disconnect()
             self.plc.connect("192.168.0.1", rack=0, slot=1)
 
-            self.connected = True
-
             if not self.plc.get_connected():
+                self.buttonconnect.setStyleSheet("""
+                                    QPushButton {
+                                    background-color: red""")
                 raise ConnectionError("No se pudo conectar al PLC.")
+            
+            self.connected = True
+            self.buttonconnect.setStyleSheet("""
+                        QPushButton {
+                        background-color: lime""")
         
         except Exception as e:
-            print(f"Error: {e}")
+            QMessageBox.about(self, 'Error','Error al conectar: {e}')
 
 
-    def updatesamp(self, text): # Funciones para comportamiento de botones y conexión a PLC
+    def mat1update(self, text): # Funciones para comportamiento de botones y conexión a PLC
         
         if text != "":
-            num = text
-            self.texto = int(num)
+            try:
+                num = text
+                self.mat1 = float(num)
+            except Exception:
+                QMessageBox.about(self, 'Error','Input can only be a number')
+                self.mat1Edit.setText("")
+
+    def mat2update(self, text): # Funciones para comportamiento de botones y conexión a PLC
+        
+        if text != "":
+
+            self.mat2 = text
+
+    def mat3update(self, text): # Funciones para comportamiento de botones y conexión a PLC
+        
+        if text != "":
+            try:
+                num = text
+                self.mat3 = float(num)
+            except Exception:
+                QMessageBox.about(self, 'Error','Input can only be a number')
+                self.mat3Edit.setText("")
+
+    def updatesamp(self, text): # Funciones para comportamiento de botones y conexión a PLC
+        if text != "":
+            try:
+                num = text
+                self.texto = int(num)
+            except Exception:
+                QMessageBox.about(self, 'Error','Input can only be an int number')
+                self.samplesEdit.setText("")
 
 
     def setSamples(self):
-        try:
-            num = self.texto
-            self.write_int(db_number=12, byte_offset=0, value=num)
+        if self.connected:
+            try:
+                num = self.texto
+                self.write_int(db_number=12, byte_offset=0, value=num)
 
-        except Exception as e:
-            print(f"Error: {e}")
-            
+            except Exception as e:
+                QMessageBox.about(self, 'Error','Error al enviar datos: {e}')
+
+                
 
     def actualizar_nombre(self): # Función para actualizar nombre de gráfica a guardar
         self.index = int(self.index) 
         self.index = self.index + 1
         self.index = str(self.index)
-        ahora = datetime.now()
-        
-        fecha_formateada = ahora.strftime("%d-%m-%Y")
-        fecha_formateada = str(fecha_formateada)
 
-        self.nombre = "Plots/grafica_" + self.index + "_" + fecha_formateada
 
+        self.nombre = "Plots/grafica_" + self.index + "_" + self.fecha_formateada
+
+
+    def log_to_google_sheets(self):
+        if not self.connected:
+            try:
+
+                presion = self.max / 6
+                self.data_row = [self.fecha_formateada, 
+                                 self.index, 
+                                 presion, 
+                                 self.tSoldadura, 
+                                 "Orientación", 
+                                 self.max, 
+                                 "Corriente", 
+                                 self.mat1, 
+                                 self.mat2, 
+                                 self.mat3]
+
+                # Autenticación con credenciales de servicio
+                creds = Credentials.from_service_account_file(
+                    self.SERVICE_ACCOUNT_FILE, scopes=self.SCOPES
+                )
+                client = gspread.authorize(creds)
+
+                # Abrir la hoja y seleccionar la pestaña
+                sheet = client.open_by_key(self.SPREADSHEET_ID).worksheet(self.WORKSHEET_NAME)
+
+                # Agregar la fila al final
+                sheet.append_row(self.data_row)
+                QMessageBox.about(self, 'Completed','Datos registrados correctamente.')
+
+
+            except Exception as e:
+                QMessageBox.about(self, 'Error','Error al registrar datos: {e}')
+
+
+    def generar_pdf(self):
+        grafico_file = self.figure
+
+        c = canvas.Canvas("reporte.pdf", pagesize=A4)
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(50, 800, "Reporte Automático")
+        c.setFont("Helvetica", 12)
+        c.drawString(50, 780, f"Generado: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+        # Insertar gráfico
+        #c.drawImage(grafico_file, 50, 500, width=500, height=250)
+
+        c.showPage()
+        c.save()
 
     def showplot(self):
 
@@ -243,7 +423,6 @@ class HMI(QWidget):
                         if y[i] > self.max:
                             self.max = y[i]
                     
-                    self.max = str(self.max)
 
                     self.tSoldadura = x[len(x) - 1]
                         
@@ -275,13 +454,13 @@ class HMI(QWidget):
                 self.figure.savefig(self.nombre)
                 
 
-
                 print("Datos de fuerza:", y)
                 print("Datos de tiempo:", x)
 
 
             except Exception as e:
-                print(f"Error: {e}")
+                QMessageBox.about(self, 'Error','Error al solicitar datos: {e}')
+
 
 
 if __name__ == "__main__":
@@ -289,4 +468,3 @@ if __name__ == "__main__":
     window = HMI()
     window.show()
     sys.exit(app.exec())
-
