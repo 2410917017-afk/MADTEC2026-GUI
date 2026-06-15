@@ -60,6 +60,7 @@ class HMI(QWidget):
         self.nombre2 = ""
         self.tSoldadura = 0
         self.max = 0.0
+        self.maxcurr = 0.0
         self.mat1 = 0
         self.mat2 = ""
         self.mat3 = ""
@@ -164,7 +165,7 @@ class HMI(QWidget):
                                   }
                                   """)
         self.buttonload.clicked.connect(self.log_to_google_sheets)
-        self.buttonload.clicked.connect(self.generar_pdf)
+        #self.buttonload.clicked.connect(self.generar_pdf)
         
         self.label1 = QLabel("Material thickness [mm]:")
         self.label1.setFont(QFont("Arial", 16))
@@ -404,7 +405,7 @@ class HMI(QWidget):
                                  self.tSoldadura, 
                                  "Orientación", 
                                  self.max, 
-                                 "Corriente", 
+                                 self.maxcurr, 
                                  self.mat1, 
                                  self.mat2, 
                                  self.mat3]
@@ -454,8 +455,8 @@ class HMI(QWidget):
 
         if  not self.connected:
             try:
-                num = self.texto
                 self.max = 0
+                self.maxcurr = 0
 
 
                 #self.time_array = self.read_dword_array(db_number=13, start_byte=0, bytes=num)
@@ -468,6 +469,11 @@ class HMI(QWidget):
                         
                         if self.force_array[i] > self.max:
                             self.max = self.force_array[i]
+
+                    for i in range(len(self.current_array)):
+                        
+                        if self.current_array[i] > self.maxcurr:
+                            self.maxcurr = self.current_array[i]
                     
 
                     self.tSoldadura = self.time_array[len(self.time_array) - 1]
@@ -478,12 +484,11 @@ class HMI(QWidget):
                 ax.plot(self.time_array, self.force_array, marker="o", color="blue")
                 ax.set_title(
                 f"Fuerza vs tiempo\n"
-                f"Tiempo de soldadura: {self.tSoldadura} | "
-                f"Fuerza máxima: {self.max} 1\n"
+                f"Tiempo de soldadura: {self.tSoldadura} ms | "
+                f"Fuerza máxima: {self.max} N \n"
                 f"Fecha: {self.fecha_formateada}"
                 , fontweight='bold', fontsize=8
                 )
-                
                 ax.set_xlabel("Tiempo")
                 ax.set_ylabel("Fuerza")
                 ax.legend()
@@ -492,14 +497,20 @@ class HMI(QWidget):
                 ax2 = self.figure2.add_subplot(111)
                 ax2.clear()  # Limpia la gráfica anterior
                 ax2.plot(self.time_array, self.current_array, marker="o", color="blue")
-                ax2.set_title("Corriente vs tiempo")
+                ax2.set_title(
+                f"Corriente vs tiempo\n"
+                f"Tiempo de soldadura: {self.tSoldadura} ms | "
+                f"Corriente máxima: {self.maxcurr} A \n"
+                f"Fecha: {self.fecha_formateada}"
+                , fontweight='bold', fontsize=8
+                )
                 ax2.set_xlabel("Tiempo")
                 ax2.set_ylabel("Corriente")
                 ax2.legend()
                 self.canvas2.draw()  # Refresca el lienzo
 
-                self.figure.savefig(self.nombre1)
-                self.figure2.savefig(self.nombre2 )
+                #self.figure.savefig(self.nombre1)
+                #self.figure2.savefig(self.nombre2 )
                 self.escribirAlerta("Datos obtenidos correctamente ✓")
                 
 
