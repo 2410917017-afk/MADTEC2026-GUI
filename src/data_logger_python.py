@@ -4,7 +4,7 @@
 
 # pip install matplotlib, pip install python-snap7, pip install pyqt6
 
-import gspread
+import gspread, time
 from google.oauth2.service_account import Credentials
 
 import sys, matplotlib.pyplot as plt, os, snap7
@@ -72,7 +72,7 @@ class HMI(QWidget):
         self.plc = snap7.client.Client() # Creación de objeto para comunicación con PLC Siemens S7-1200
 
 
-        self.paramGroup = QGroupBox("Parameters")
+        self.paramGroup = QGroupBox("Parametros")
         self.paramGroup.setStyleSheet("background-color: dimgrey; color: whitesmoke; border-radius: 10px")
         self.paramGroup.setFont(QFont("Arial", 14))
 
@@ -87,9 +87,9 @@ class HMI(QWidget):
         self.canvas2 = FigureCanvas(self.figure2)
         
 
-        self.buttonstart = QPushButton("Start") # Creación y configuración de elementos incluidos en la GUI
+        self.buttonstart = QPushButton("Leer datos") # Creación y configuración de elementos incluidos en la GUI
         self.buttonstart.setFont(QFont("Arial", 20))
-        self.buttonstart.setFixedSize(80, 80)
+        self.buttonstart.setFixedSize(160, 80)
         self.buttonstart.setStyleSheet("""
                                   QPushButton {
                                   background-color: darkslategrey; 
@@ -109,7 +109,7 @@ class HMI(QWidget):
         
 
 
-        self.buttonconnect = QPushButton("Connect")
+        self.buttonconnect = QPushButton("Conectar")
         self.buttonconnect.setFont(QFont("Arial", 20))
         self.buttonconnect.setFixedSize(150, 75)
         self.buttonconnect.setStyleSheet("""
@@ -128,9 +128,9 @@ class HMI(QWidget):
                                   """)
         self.buttonconnect.clicked.connect(self.connectPLC)
 
-        self.buttonset = QPushButton("Set")
+        self.buttonset = QPushButton("Configurar")
         self.buttonset.setFont(QFont("Arial", 20))
-        self.buttonset.setFixedSize(100, 75)
+        self.buttonset.setFixedSize(160, 75)
         self.buttonset.setStyleSheet("""
                                   QPushButton {
                                   background-color: darkslategrey; 
@@ -147,9 +147,9 @@ class HMI(QWidget):
                                   """)
         self.buttonset.clicked.connect(self.setSamples)
 
-        self.buttonload = QPushButton("Load data")
+        self.buttonload = QPushButton("Guardar datos")
         self.buttonload.setFont(QFont("Arial", 20))
-        self.buttonload.setFixedSize(150, 75)
+        self.buttonload.setFixedSize(200, 75)
         self.buttonload.setStyleSheet("""
                                   QPushButton {
                                   background-color: darkslategrey; 
@@ -166,8 +166,28 @@ class HMI(QWidget):
                                   """)
         self.buttonload.clicked.connect(self.log_to_google_sheets)
         #self.buttonload.clicked.connect(self.generar_pdf)
+
+        self.buttonimage = QPushButton("Guardar imagen")
+        self.buttonimage.setFont(QFont("Arial", 20))
+        self.buttonimage.setFixedSize(220, 75)
+        self.buttonimage.setStyleSheet("""
+                                  QPushButton {
+                                  background-color: darkslategrey; 
+                                  color: silver; border: none; 
+                                  border-radius: 20px; 
+                                  padding: 10px 10px
+                                  }
+                                  QPushButton:hover {
+                                  background-color: darkgrey;
+                                  }
+                                  QPushButton:pressed {
+                                  padding: 11px 9px 9px 11px;
+                                  }
+                                  """)
+        self.buttonimage.clicked.connect(self.load_image)
+
         
-        self.label1 = QLabel("Material thickness [mm]:")
+        self.label1 = QLabel("Grosor del material [mm]:")
         self.label1.setFont(QFont("Arial", 16))
         self.label1.setStyleSheet("color: whitesmoke")
         self.label1.setAlignment(Qt.AlignmentFlag.AlignRight)
@@ -180,7 +200,7 @@ class HMI(QWidget):
         self.mat1Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
         self.mat1Edit.textChanged.connect(self.mat1update)
 
-        self.label2 = QLabel("Material type:")
+        self.label2 = QLabel("Tipo de material:")
         self.label2.setFont(QFont("Arial", 16))
         self.label2.setStyleSheet("color: whitesmoke")
         self.label2.setAlignment(Qt.AlignmentFlag.AlignRight)
@@ -193,7 +213,7 @@ class HMI(QWidget):
         self.mat2Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
         self.mat2Edit.textChanged.connect(self.mat2update)
 
-        self.label3 = QLabel("Nugget diameter [mm]:")
+        self.label3 = QLabel("Diam. de soldadura [mm]:")
         self.label3.setFont(QFont("Arial", 16))
         self.label3.setStyleSheet("color: whitesmoke")
         self.label3.setAlignment(Qt.AlignmentFlag.AlignRight)
@@ -207,7 +227,7 @@ class HMI(QWidget):
         self.mat3Edit.textChanged.connect(self.mat3update)
 
         self.samplesEdit = QLineEdit() # Bloque de edición para definición de número de muestras a recopilar
-        self.samplesEdit.setPlaceholderText("N. of samples...")
+        self.samplesEdit.setPlaceholderText("N. de muestras...")
         self.samplesEdit.setFont(QFont("Arial", 18))
         self.samplesEdit.setFixedSize(160, 75)
         self.samplesEdit.setStyleSheet("color: black; background-color: silver")
@@ -233,6 +253,7 @@ class HMI(QWidget):
         cntrl_layout.addWidget(self.samplesEdit, 0, 2)
         cntrl_layout.addWidget(self.buttonset, 0, 3)
         cntrl_layout.addWidget(self.buttonload, 0, 4)
+        cntrl_layout.addWidget(self.buttonimage, 0, 5)
 
         self.controlGroup.setLayout(cntrl_layout)
 
@@ -307,25 +328,24 @@ class HMI(QWidget):
             self.plc.disconnect()
             self.plc.connect("192.168.0.1", rack=0, slot=1)
 
-            if not self.plc.get_connected():
-                self.buttonconnect.setStyleSheet("""
-                                    QPushButton {
-                                    background-color: red""")
-                raise ConnectionError("No se pudo conectar al PLC.")
-            
+
             self.connected = True
             self.alerts.setPlainText("Conectado a PLC.")
-            self.buttonconnect.setStyleSheet("""
-                        QPushButton {
-                        background-color: lime""")
+            self.buttonconnect.setStyleSheet("background-color: green")
         
         except Exception as e:
+            self.buttonconnect.setStyleSheet("background-color: red")
             self.escribirAlerta("Error. Error al conectar: " + str(e))
 
     def escribirAlerta(self, texto):
         texto_actual = self.alerts.toPlainText()
         # Insertar nuevo texto antes del existente
         self.alerts.setPlainText(">" + texto + "\n" + texto_actual)
+
+    def load_image(self):
+        self.figure.savefig(self.nombre1)
+        self.figure2.savefig(self.nombre2)
+        self.escribirAlerta("Imágenes guardadas. ✓")
 
 
     def mat1update(self, text): # Funciones para comportamiento de botones y conexión a PLC
@@ -335,7 +355,7 @@ class HMI(QWidget):
                 num = text
                 self.mat1 = float(num)
             except Exception:
-                self.escribirAlerta("Error. Input can only be a number")
+                self.escribirAlerta("Error. En este campo solo puede ingresar números.")
 
                 self.mat1Edit.setText("")
 
@@ -354,7 +374,7 @@ class HMI(QWidget):
                 self.mat3 = float(num)
     
             except Exception:
-                self.escribirAlerta("Error. Input can only be a number")
+                self.escribirAlerta("Error. En este campo solo puede ingresar números.")
                 self.mat3Edit.setText("")
 
     def updatesamp(self, text): # Funciones para comportamiento de botones y conexión a PLC
@@ -363,7 +383,7 @@ class HMI(QWidget):
                 num = text
                 self.texto = int(num)
             except Exception:
-                self.escribirAlerta("Error. Input can only be an int number")
+                self.escribirAlerta("Error. En este campo solo puede ingresar números enteros.")
                 self.samplesEdit.setText("")
 
 
@@ -372,6 +392,7 @@ class HMI(QWidget):
             try:
                 num = self.texto
                 self.write_int(db_number=12, byte_offset=0, value=num)
+                self.escribirAlerta("Número de muestras configurado ✓")
 
             except Exception as e:
                 self.escribirAlerta("Error. Error al enviar datos")
@@ -389,18 +410,20 @@ class HMI(QWidget):
         
         self.fecha_formateada = ahora.strftime("%d-%m-%Y-%H-%M-%S")
 
-        self.nombre1 = "Plots/grafica_" +  "1" + "_" + self.fecha_formateada
-        self.nombre2 = "Plots/grafica_" +  "2" + "_" + self.fecha_formateada
+        self.identif = str(self.index) + "-" + self.fecha_formateada
+
+        self.nombre1 = "Plots/grafica_" +  "F" + "_" + self.identif
+        self.nombre2 = "Plots/grafica_" +  "I" + "_" + self.identif
 
 
     def log_to_google_sheets(self):
-        if not self.connected:
+        if self.connected:
             try:
 
                 presion = self.max / 6
-                identif = str(self.index) + "-" + self.fecha_formateada
 
-                data_row = [identif,
+                data_row = [self.identif,
+                                 self.texto,
                                  presion, 
                                  self.tSoldadura, 
                                  "Orientación", 
@@ -420,14 +443,29 @@ class HMI(QWidget):
                 # Abrir la hoja y seleccionar la pestaña
                 sheet = client.open_by_key(self.SPREADSHEET_ID).worksheet(self.WORKSHEET_NAME)
 
-                # Agregar la fila al final
+                # Agregar las filas al final
                 sheet.append_row(data_row)
-                self.escribirAlerta("Datos registrados correctamente ✓")
 
                 sheet2 = client.open_by_key(self.SPREADSHEET_ID).worksheet(self.WORKSHEET_NAME2)
-                for i in range(len(self.time_array)):
-                    sheet2.append_row([identif, self.time_array[i], self.force_array[i], self.current_array[i]])
 
+                if len(self.time_array) > 50:
+                    ciclos = (len(self.time_array) + 49) // 50  
+                    
+                    for i in range(ciclos):
+                        start = i * 50
+                        end = min(start + 50, len(self.time_array))  
+                        
+                        for j in range(start, end):
+                            sheet2.append_row([self.identif, self.time_array[j], self.force_array[j], self.current_array[j]])
+                        
+                        if i < ciclos - 1: 
+                            time.sleep(60)
+                else:
+                    for i in range(len(self.time_array)):
+                        sheet2.append_row([self.identif, self.time_array[i], self.force_array[i], self.current_array[i]])
+
+                self.escribirAlerta("Datos registrados correctamente ✓")
+            
 
             except Exception as e:
                 self.escribirAlerta("Error." + str(e))
@@ -453,15 +491,18 @@ class HMI(QWidget):
 
     def showplot(self):
 
-        if  not self.connected:
+        if  self.connected:
             try:
                 self.max = 0
                 self.maxcurr = 0
+                num = self.texto
 
+                self.figure.clear()
+                self.figure2.clear()
 
-                #self.time_array = self.read_dword_array(db_number=13, start_byte=0, bytes=num)
-                #self.force_array = self.read_real_array(db_number=1, start_byte=0, bytes=num)
-                #self.current_array = self.read_rel_array(db_number=4, start_byte=0, bytes=num)
+                self.time_array = self.read_dword_array(db_number=13, start_byte=0, bytes=num)
+                self.force_array = self.read_real_array(db_number=1, start_byte=0, bytes=num)
+                self.current_array = self.read_real_array(db_number=15, start_byte=0, bytes=num)
 
 
                 if len(self.time_array) and len(self.force_array) > 5 :
@@ -480,12 +521,13 @@ class HMI(QWidget):
                         
 
                 ax = self.figure.add_subplot(111)
-                ax.clear()  # Limpia la gráfica anterior
+                ax.clear()  
                 ax.plot(self.time_array, self.force_array, marker="o", color="blue")
                 ax.set_title(
                 f"Fuerza vs tiempo\n"
                 f"Tiempo de soldadura: {self.tSoldadura} ms | "
-                f"Fuerza máxima: {self.max} N \n"
+                f"N. de muestras: {self.texto} | "
+                f"F máxima: {self.max} N \n"
                 f"Fecha: {self.fecha_formateada}"
                 , fontweight='bold', fontsize=8
                 )
@@ -495,12 +537,13 @@ class HMI(QWidget):
                 self.canvas.draw()  # Refresca el lienzo
 
                 ax2 = self.figure2.add_subplot(111)
-                ax2.clear()  # Limpia la gráfica anterior
+                ax2.clear() 
                 ax2.plot(self.time_array, self.current_array, marker="o", color="blue")
                 ax2.set_title(
                 f"Corriente vs tiempo\n"
                 f"Tiempo de soldadura: {self.tSoldadura} ms | "
-                f"Corriente máxima: {self.maxcurr} A \n"
+                f"N. de muestras: {self.texto} | "
+                f"I máxima: {self.maxcurr} A \n"
                 f"Fecha: {self.fecha_formateada}"
                 , fontweight='bold', fontsize=8
                 )
@@ -509,14 +552,13 @@ class HMI(QWidget):
                 ax2.legend()
                 self.canvas2.draw()  # Refresca el lienzo
 
-                #self.figure.savefig(self.nombre1)
-                #self.figure2.savefig(self.nombre2 )
                 self.escribirAlerta("Datos obtenidos correctamente ✓")
+                self.escribirAlerta(f"Número de identificación: {self.identif}")
                 
 
-                print("Datos de fuerza:", self.force_array)
-                print("Datos de tiempo:", self.time_array)
-                print("Datos de corriente:", self.current_array)
+                #print("Datos de fuerza:", self.force_array)
+                #print("Datos de tiempo:", self.time_array)
+                #print("Datos de corriente:", self.current_array)
 
 
             except Exception as e:
