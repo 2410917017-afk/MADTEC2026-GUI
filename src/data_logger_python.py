@@ -4,20 +4,17 @@
 
 # pip install matplotlib, pip install python-snap7, pip install pyqt6
 
-import gspread, time
-from google.oauth2.service_account import Credentials
 
-import sys, matplotlib.pyplot as plt, os, snap7
+import sys, matplotlib.pyplot as plt, snap7, sqlite3
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from snap7.util import get_int, get_real, get_bool, set_int, set_bool, get_dword
 from PyQt6.QtWidgets import (
-    QApplication, QWidget, QGridLayout, QPushButton, QLineEdit, QLabel, QGroupBox, QMessageBox, QTextEdit
+    QApplication, QWidget, QGridLayout, QPushButton, QLineEdit, QLabel, QGroupBox, QTextEdit
 )
 from PyQt6.QtGui import  QFont
 from PyQt6.QtCore import Qt
 from datetime import datetime
-from openpyxl import load_workbook, Workbook
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
@@ -36,20 +33,6 @@ class HMI(QWidget):
         cntrl_layout = QGridLayout()
         cntrl_layout.setContentsMargins(10, 20, 10, 20)
 
-
-        # Alcances necesarios para leer/escribir en Google Sheets
-        self.SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-
-        # Ruta al archivo de credenciales JSON
-        self.SERVICE_ACCOUNT_FILE = "imposing-eye-463014-c6-dc68c49329ea.json"
-
-        # ID de la hoja de cálculo (lo obtienes de la URL de Google Sheets)
-        self.SPREADSHEET_ID = "1lXYWTcKbLMyeU1un209UrB6Grzs2deBy58QLIhDxg70"
-
-        # Nombre de la pestaña dentro de la hoja
-        self.WORKSHEET_NAME = "Hoja 1"
-
-        self.WORKSHEET_NAME2 = "Hoja 2"
 
         ahora = datetime.now()
 
@@ -164,7 +147,7 @@ class HMI(QWidget):
                                   padding: 11px 9px 9px 11px;
                                   }
                                   """)
-        self.buttonload.clicked.connect(self.log_to_google_sheets)
+        self.buttonload.clicked.connect(self.logDB)
         #self.buttonload.clicked.connect(self.generar_pdf)
 
         self.buttonimage = QPushButton("Guardar imagen")
@@ -340,7 +323,7 @@ class HMI(QWidget):
     def escribirAlerta(self, texto):
         texto_actual = self.alerts.toPlainText()
         # Insertar nuevo texto antes del existente
-        self.alerts.setPlainText(">" + texto + "\n" + texto_actual)
+        self.alerts.setPlainText(">" + texto + "\n" + "\n" + texto_actual)
 
     def load_image(self):
         self.figure.savefig(self.nombre1)
@@ -416,59 +399,65 @@ class HMI(QWidget):
         self.nombre2 = "Plots/grafica_" +  "I" + "_" + self.identif
 
 
-    def log_to_google_sheets(self):
+
+	
+
+    def logDB(self):
         if self.connected:
             try:
-
-                presion = self.max / 6
-
-                data_row = [self.identif,
-                                 self.texto,
-                                 presion, 
-                                 self.tSoldadura, 
-                                 "Orientación", 
-                                 self.max, 
-                                 self.maxcurr, 
-                                 self.mat1, 
-                                 self.mat2, 
-                                 self.mat3]
-                
-
-                # Autenticación con credenciales de servicio
-                creds = Credentials.from_service_account_file(
-                    self.SERVICE_ACCOUNT_FILE, scopes=self.SCOPES
-                )
-                client = gspread.authorize(creds)
-
-                # Abrir la hoja y seleccionar la pestaña
-                sheet = client.open_by_key(self.SPREADSHEET_ID).worksheet(self.WORKSHEET_NAME)
-
-                # Agregar las filas al final
-                sheet.append_row(data_row)
-
-                sheet2 = client.open_by_key(self.SPREADSHEET_ID).worksheet(self.WORKSHEET_NAME2)
-
-                if len(self.time_array) > 50:
-                    ciclos = (len(self.time_array) + 49) // 50  
-                    
-                    for i in range(ciclos):
-                        start = i * 50
-                        end = min(start + 50, len(self.time_array))  
-                        
-                        for j in range(start, end):
-                            sheet2.append_row([self.identif, self.time_array[j], self.force_array[j], self.current_array[j]])
-                        
-                        if i < ciclos - 1: 
-                            time.sleep(60)
-                else:
-                    for i in range(len(self.time_array)):
-                        sheet2.append_row([self.identif, self.time_array[i], self.force_array[i], self.current_array[i]])
-
-                self.escribirAlerta("Datos registrados correctamente ✓")
             
+                presion = self.max / 6
+                id_array = [0] * len(self.time_array)
+
+                for i in range(len(self.time_array)):
+
+                    id_array[i] = self.identif
+
+                conn = sqlite3.connect("soldadura.db")
+
+                cursor = conn.cursor()
+
+                cursor.execute("""
+                INSERT INTO Pruebas
+                (Id, Muestras, Presion, Tiempo, Orientacion, Fmax, Imax, Grosor, Material, Diametro)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)	
+                """,
+                (
+                    self.identif,
+                    self.texto,
+                    presion, 
+                    self.tSoldadura, 
+                    "Orientación", 
+                    self.max, 
+                    self.maxcurr, 
+                    self.mat1, 
+                    self.mat2, 
+                    self.mat3
+
+                ))
+
+                for m in range(len(self.time_array)):
+
+                    cursor.execute("""
+                    INSERT INTO Datos
+                    (Id, Tiempo, Fuerza, Corriente)
+                    VALUES (?, ?, ?, ?)	
+                    """,
+                    (
+                        id_array[m],
+                        self.time_array[m],
+                        self.force_array[m],
+                        self.current_array[m]
+
+                    ))
+
+                conn.commit()
+                conn.close()
+                self.escribirAlerta("Datos registrados correctamente ✓")
 
             except Exception as e:
-                self.escribirAlerta("Error." + str(e))
+                self.escribirAlerta("Error. Error al registrar datos: " + str(e))
+
         else:
             self.escribirAlerta("Error. PLC no conectado.")
 
