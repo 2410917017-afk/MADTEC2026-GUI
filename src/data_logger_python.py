@@ -47,9 +47,9 @@ class HMI(QWidget):
         self.mat1 = 0
         self.mat2 = ""
         self.mat3 = ""
-        self.force_array = [0, 1, 2, 4, 5, 4, 2, 1, 0]
-        self.time_array = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-        self.current_array = [0, 1, 2, 1, 0, 1, 2, 1, 0]
+        self.force_array = []
+        self.time_array = []
+        self.current_array = []
         self.fecha_formateada = ahora.strftime("%d-%m-%Y-%H-%M-%S")
 
         self.plc = snap7.client.Client() # Creación de objeto para comunicación con PLC Siemens S7-1200
