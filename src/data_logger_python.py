@@ -5,7 +5,7 @@
 # pip install matplotlib, pip install python-snap7, pip install pyqt6
 
 
-import sys, matplotlib.pyplot as plt, snap7, sqlite3
+import sys, matplotlib.pyplot as plt, snap7, sqlite3, psycopg2, psycopg2.extras
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from snap7.util import get_int, get_real, get_bool, set_int, set_bool, get_dword
@@ -47,9 +47,9 @@ class HMI(QWidget):
         self.mat1 = 0
         self.mat2 = ""
         self.mat3 = ""
-        self.force_array = []
-        self.time_array = []
-        self.current_array = []
+        self.force_array = [0, 1, 2, 4, 5, 4, 2, 1, 0]
+        self.time_array = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+        self.current_array = [0, 1, 2, 1, 0, 1, 2, 1, 0]
         self.fecha_formateada = ahora.strftime("%d-%m-%Y-%H-%M-%S")
 
         self.plc = snap7.client.Client() # Creación de objeto para comunicación con PLC Siemens S7-1200
@@ -147,7 +147,8 @@ class HMI(QWidget):
                                   padding: 11px 9px 9px 11px;
                                   }
                                   """)
-        self.buttonload.clicked.connect(self.logDB)
+        self.buttonload.clicked.connect(self.log_postgresql)
+        #self.buttonload.clicked.connect(self.logDB)
         #self.buttonload.clicked.connect(self.generar_pdf)
 
         self.buttonimage = QPushButton("Guardar imagen")
@@ -279,6 +280,7 @@ class HMI(QWidget):
    
         return values
     
+    
     def read_real_array(self, db_number, start_byte, bytes):
         total_size = bytes * 4
 
@@ -320,10 +322,12 @@ class HMI(QWidget):
             self.buttonconnect.setStyleSheet("background-color: red")
             self.escribirAlerta("Error. Error al conectar: " + str(e))
 
+
     def escribirAlerta(self, texto):
         texto_actual = self.alerts.toPlainText()
         # Insertar nuevo texto antes del existente
         self.alerts.setPlainText(">" + texto + "\n" + "\n" + texto_actual)
+
 
     def load_image(self):
         self.figure.savefig(self.nombre1)
@@ -349,6 +353,7 @@ class HMI(QWidget):
 
             self.mat2 = text
 
+
     def mat3update(self, text): # Funciones para comportamiento de botones y conexión a PLC
         
         if text != "":
@@ -359,6 +364,7 @@ class HMI(QWidget):
             except Exception:
                 self.escribirAlerta("Error. En este campo solo puede ingresar números.")
                 self.mat3Edit.setText("")
+
 
     def updatesamp(self, text): # Funciones para comportamiento de botones y conexión a PLC
         if text != "":
@@ -381,7 +387,6 @@ class HMI(QWidget):
                 self.escribirAlerta("Error. Error al enviar datos")
         else:
             self.escribirAlerta("Error. PLC no conectado.")
-
                 
 
     def actualizar_nombre(self): # Función para actualizar nombre de gráfica a guardar
@@ -397,35 +402,37 @@ class HMI(QWidget):
 
         self.nombre1 = "Plots/grafica_" +  "F" + "_" + self.identif
         self.nombre2 = "Plots/grafica_" +  "I" + "_" + self.identif
-
-
-
 	
 
-    def logDB(self):
+    def log_postgresql(self):
+
+        conn = psycopg2.connect(
+            host="localhost",
+            database="CETEVI_1",
+            user="postgres",
+            password="cetevi123",
+            port=5432
+        )
+
+        id_array = [0] * len(self.time_array)
+
+        for i in range(len(self.time_array)):
+
+            id_array[i] = self.identif
+
         if self.connected:
             try:
-            
-                presion = self.max / 6
-                id_array = [0] * len(self.time_array)
-
-                for i in range(len(self.time_array)):
-
-                    id_array[i] = self.identif
-
-                conn = sqlite3.connect("soldadura.db")
-
                 cursor = conn.cursor()
 
                 cursor.execute("""
-                INSERT INTO Pruebas
-                (Id, Muestras, Presion, Tiempo, Orientacion, Fmax, Imax, Grosor, Material, Diametro)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)	
+                INSERT INTO public."Pruebas"(
+                "Id", "Muestras", "Tiempo", "Orientación", "Fmax", "Imax", "Grosor", "Material", "Diametro")
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);	
                 """,
                 (
+                
                     self.identif,
                     self.texto,
-                    presion, 
                     self.tSoldadura, 
                     "Orientación", 
                     self.max, 
@@ -439,11 +446,12 @@ class HMI(QWidget):
                 for m in range(len(self.time_array)):
 
                     cursor.execute("""
-                    INSERT INTO Datos
-                    (Id, Tiempo, Fuerza, Corriente)
-                    VALUES (?, ?, ?, ?)	
+                    INSERT INTO public."Datos"(
+                    "Id", "Tiempo", "Fuerza", "Corriente")
+                    VALUES (%s, %s, %s, %s);
                     """,
                     (
+        
                         id_array[m],
                         self.time_array[m],
                         self.force_array[m],
@@ -452,8 +460,10 @@ class HMI(QWidget):
                     ))
 
                 conn.commit()
+                cursor.close()
                 conn.close()
                 self.escribirAlerta("Datos registrados correctamente ✓")
+
 
             except Exception as e:
                 self.escribirAlerta("Error. Error al registrar datos: " + str(e))
@@ -477,6 +487,7 @@ class HMI(QWidget):
         c.showPage()
         c.save()
         self.escribirAlerta("Reporte guardado ✓")
+
 
     def showplot(self):
 
@@ -551,7 +562,7 @@ class HMI(QWidget):
 
 
             except Exception as e:
-                self.escribirAlerta("Error. Error al solicitar datos: " + str(e))
+                self.escribirAlerta("Error. Error al solicitar datos: " + str(e))  
 
         else:
             self.escribirAlerta("Error. PLC no conectado.")
