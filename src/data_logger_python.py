@@ -1,11 +1,11 @@
 # Código para la adquisición de datos preliminar en la validación de la instrumentación del proceso de soldadura por puntos.
 # Incluye interfaz gráfica simple para el muestreo y graficación de datos, así como guardar las gráficas en una carpeta dedicada.
-# Comandos para instalara librerías requeridas, contando ya con Python (usamos versión 3.14):
+# Comandos para instalara librerías requeridas, contando ya con Python (usamos versión 3.10.0):
 
-# pip install matplotlib, pip install python-snap7, pip install pyqt6
+# pip install matplotlib, python-snap7, PyQt6, psycopg2-binary
 
 
-import sys, matplotlib.pyplot as plt, snap7, sqlite3, psycopg2, psycopg2.extras
+import sys, matplotlib.pyplot as plt, snap7, psycopg2, psycopg2.extras
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from snap7.util import get_int, get_real, get_bool, set_int, set_bool, get_dword
@@ -15,8 +15,6 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import  QFont
 from PyQt6.QtCore import Qt
 from datetime import datetime
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
 
 # Inicialización de interfaz gráfica
 class HMI(QWidget):
@@ -32,7 +30,6 @@ class HMI(QWidget):
         param_layout.setContentsMargins(10, 20, 10, 20)
         cntrl_layout = QGridLayout()
         cntrl_layout.setContentsMargins(10, 20, 10, 20)
-
 
         ahora = datetime.now()
 
@@ -148,7 +145,6 @@ class HMI(QWidget):
                                   }
                                   """)
         self.buttonload.clicked.connect(self.log_postgresql)
-        #self.buttonload.clicked.connect(self.logDB)
         #self.buttonload.clicked.connect(self.generar_pdf)
 
         self.buttonimage = QPushButton("Guardar imagen")
@@ -472,23 +468,6 @@ class HMI(QWidget):
             self.escribirAlerta("Error. PLC no conectado.")
 
 
-    def generar_pdf(self):
-        grafico_file = self.figure
-
-        c = canvas.Canvas("reporte.pdf", pagesize=A4)
-        c.setFont("Helvetica-Bold", 16)
-        c.drawString(50, 800, "Reporte Automático")
-        c.setFont("Helvetica", 12)
-        c.drawString(50, 780, f"Generado: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-
-        # Insertar gráfico
-        #c.drawImage(grafico_file, 50, 500, width=500, height=250)
-
-        c.showPage()
-        c.save()
-        self.escribirAlerta("Reporte guardado ✓")
-
-
     def showplot(self):
 
         if  self.connected:
@@ -570,6 +549,9 @@ class HMI(QWidget):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    window = HMI()
+    window.show()
+    sys.exit(app.exec())
     window = HMI()
     window.show()
     sys.exit(app.exec())
