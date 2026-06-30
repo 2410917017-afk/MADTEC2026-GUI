@@ -552,6 +552,4 @@ if __name__ == "__main__":
     window = HMI()
     window.show()
     sys.exit(app.exec())
-    window = HMI()
-    window.show()
-    sys.exit(app.exec())
+   
