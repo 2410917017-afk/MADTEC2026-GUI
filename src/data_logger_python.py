@@ -1,3 +1,24 @@
+# Código para la adquisición de datos preliminar en la validación de la instrumentación del proceso de soldadura por puntos.
+# Incluye interfaz gráfica simple para el muestreo y graficación de datos, así como guardar las gráficas en una carpeta dedicada.
+# Comandos para instalar librerías requeridas, contando ya con Python (usamos versión 3.10.0):
+
+# pip install matplotlib python-snap7 PyQt5 psycopg2-binary
+
+import sys, matplotlib.pyplot as plt, snap7, psycopg2, psycopg2.extras, matplotlib
+matplotlib.use('Qt5Agg')
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
+from snap7.util import get_int, get_real, get_bool, set_int, set_bool, get_dword
+from PyQt5.QtWidgets import (
+    QApplication, QWidget, QGridLayout, QPushButton, QLineEdit, QLabel, QGroupBox, QTextEdit
+)
+from PyQt5.QtGui import QFont
+from PyQt5.QtCore import Qt
+from datetime import datetime
+
+
+# Inicialización de interfaz gráfica
+class HMI(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("PLC Plotter")  # Configuración de la ventana de la GUI
@@ -492,3 +513,9 @@
         else:
             self.escribirAlerta("Error. PLC no conectado.")
 
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = HMI()
+    window.show()
+    sys.exit(app.exec_())
