@@ -4,7 +4,7 @@
 
 # pip install matplotlib python-snap7 PyQt5 psycopg2-binary
 
-import sys, matplotlib.pyplot as plt, snap7, psycopg2, psycopg2.extras, matplotlib
+import sys, matplotlib.pyplot as plt, snap7, psycopg2, psycopg2.extras, matplotlib, requests
 matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -25,6 +25,7 @@ class HMI(QWidget):
         # self.setFixedSize(1300, 600)
         self.setStyleSheet("background-color: #001b1b")
 
+
         main_layout = QGridLayout(self)  # Distribución de rejilla, renglones y columnas
         main_layout.setContentsMargins(10, 10, 10, 10)
         param_layout = QGridLayout()
@@ -32,7 +33,29 @@ class HMI(QWidget):
         cntrl_layout = QGridLayout()
         cntrl_layout.setContentsMargins(10, 20, 10, 20)
 
+        self.base_url = "http://192.168.2.199:8000"
+        self.datos = {
+              "Id": "",
+              "Muestras": 0,
+              "Tiempo": 0,
+              "Orientacion": "",
+              "FMax": 0,
+              "IMax": 0,
+              "Grosor": 0,
+              "Material": "",
+              "Diametro": 0
+            }
+
+        self.datos_2 = {
+            "Id" : "",
+            "Tiempo" : 0,
+            "Fuerza" : 0,
+            "Corriente" : 0
+        }
+
         ahora = datetime.now()
+
+        self.identif = ""
 
         self.connected = False  # Declaración de variables utilizadas
         self.texto = 0
@@ -60,10 +83,10 @@ class HMI(QWidget):
         self.controlGroup.setStyleSheet("background-color: #001b1b; color: whitesmoke; border-radius: 10px")
         self.controlGroup.setFont(QFont("Arial", 14))
 
-        self.figure = Figure(figsize=(6, 6), dpi=100)  # Creación de espacio para graficar datos adquiridos del PLC
+        self.figure = Figure(figsize=(8, 4), dpi=100)  # Creación de espacio para graficar datos adquiridos del PLC
         self.canvas = FigureCanvas(self.figure)
 
-        self.figure2 = Figure(figsize=(6, 6), dpi=100)
+        self.figure2 = Figure(figsize=(8, 4), dpi=100)
         self.canvas2 = FigureCanvas(self.figure2)
 
         self.buttonstart = QPushButton("Leer datos")  # Creación y configuración de elementos incluidos en la GUI
@@ -142,7 +165,8 @@ class HMI(QWidget):
                                   padding: 11px 9px 9px 11px;
                                   }
                                   """)
-        self.buttonload.clicked.connect(self.log_postgresql)
+        self.buttonload.clicked.connect(self.crear_prueba)
+        #self.buttonload.clicked.connect(self.log_postgresql)
         # self.buttonload.clicked.connect(self.generar_pdf)
 
         self.buttonimage = QPushButton("Guardar imagen")
@@ -215,10 +239,10 @@ class HMI(QWidget):
 
         param_layout.addWidget(self.label1, 0, 0)
         param_layout.addWidget(self.mat1Edit, 0, 1)
-        param_layout.addWidget(self.label2, 0, 2)
-        param_layout.addWidget(self.mat2Edit, 0, 3)
-        param_layout.addWidget(self.label3, 0, 4)
-        param_layout.addWidget(self.mat3Edit, 0, 5)
+        param_layout.addWidget(self.label2, 1, 0)
+        param_layout.addWidget(self.mat2Edit, 1, 1)
+        param_layout.addWidget(self.label3, 2, 0)
+        param_layout.addWidget(self.mat3Edit, 2, 1)
 
         self.paramGroup.setLayout(param_layout)
 
@@ -231,10 +255,10 @@ class HMI(QWidget):
 
         self.controlGroup.setLayout(cntrl_layout)
 
-        main_layout.addWidget(self.paramGroup, 3, 0, 1, 3)
-        main_layout.addWidget(self.controlGroup, 4, 0, 1, 3)
-        main_layout.addWidget(self.canvas, 0, 0, 2, 1)
-        main_layout.addWidget(self.canvas2, 0, 1, 2, 1)
+        main_layout.addWidget(self.paramGroup, 0, 0, 2, 1)
+        main_layout.addWidget(self.controlGroup, 2, 0, 1, 3)
+        main_layout.addWidget(self.canvas, 0, 1, 1, 1)
+        main_layout.addWidget(self.canvas2, 1, 1, 1, 1)
         main_layout.addWidget(self.alerts, 0, 2, 2, 1)
 
     def write_int(self, db_number, byte_offset, value: int):  # Funciones para comunicación GUI <-> PLC
@@ -288,6 +312,59 @@ class HMI(QWidget):
         data = self.plc.db_read(db, byte_offset, 1)
         set_bool(data, 0, bit, value)
         self.plc.db_write(db, byte_offset, data)
+
+    def obtener_pruebas(self):
+        return requests.get(f"{self.base_url}/pruebas").json()
+
+    def crear_prueba(self):
+        if self.connected:
+            try:
+
+                id_array = [0] * len(self.time_array)
+                id_enviado = False
+
+                for i in range(len(self.time_array)):
+                    id_array[i] = self.identif
+
+                self.datos = {
+                      "Id": self.identif,
+                      "Muestras": self.texto,
+                      "Tiempo": self.tSoldadura,
+                      "Orientacion": "string",
+                      "FMax": self.max,
+                      "IMax": self.maxcurr,
+                      "Grosor": self.mat1,
+                      "Material": self.mat2,
+                      "Diametro": self.mat3
+                }
+
+                requests.post(f"{self.base_url}/pruebas", json=self.datos).json()
+
+                for m in range(len(self.time_array)):
+                    if m > 0:
+                        id_enviado = True
+
+                    if id_enviado:
+                        self.identif = ""
+
+                    self.datos_2 = {
+                        "Id" : self.identif,
+                        "Tiempo" : self.time_array[m],
+                        "Fuerza" : self.force_array[m],
+                        "Corriente" : self.current_array[m]
+                    }
+
+                    requests.post(f"{self.base_url}/datos", json=self.datos_2).json()
+
+                self.escribirAlerta("Datos registrados correctamente ✓")
+
+            except Exception as e:
+                #self.escribirAlerta("Error. Error al registrar datos: " + str(e))
+                print(e)
+
+        else:
+            self.escribirAlerta("Error. PLC no conectado.")
+
 
     def connectPLC(self):  # Función para establecer conexión
         try:
@@ -375,69 +452,6 @@ class HMI(QWidget):
         self.nombre1 = "Plots/grafica_" + "F" + "_" + self.identif
         self.nombre2 = "Plots/grafica_" + "I" + "_" + self.identif
 
-    def log_postgresql(self):
-
-        conn = psycopg2.connect(
-            host="localhost",
-            database="CETEVI_1",
-            user="postgres",
-            password="cetevi123",
-            port=5432
-        )
-
-        id_array = [0] * len(self.time_array)
-
-        for i in range(len(self.time_array)):
-            id_array[i] = self.identif
-
-        if self.connected:
-            try:
-                cursor = conn.cursor()
-
-                cursor.execute("""
-                               INSERT INTO public."Pruebas"("Id", "Muestras", "Tiempo", "Orientación", "Fmax", "Imax",
-                                                            "Grosor", "Material", "Diametro")
-                               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
-                               """,
-                               (
-
-                                   self.identif,
-                                   self.texto,
-                                   self.tSoldadura,
-                                   "Orientación",
-                                   self.max,
-                                   self.maxcurr,
-                                   self.mat1,
-                                   self.mat2,
-                                   self.mat3
-
-                               ))
-
-                for m in range(len(self.time_array)):
-                    cursor.execute("""
-                                   INSERT INTO public."Datos"("Id", "Tiempo", "Fuerza", "Corriente")
-                                   VALUES (%s, %s, %s, %s);
-                                   """,
-                                   (
-
-                                       id_array[m],
-                                       self.time_array[m],
-                                       self.force_array[m],
-                                       self.current_array[m]
-
-                                   ))
-
-                conn.commit()
-                cursor.close()
-                conn.close()
-                self.escribirAlerta("Datos registrados correctamente ✓")
-
-
-            except Exception as e:
-                self.escribirAlerta("Error. Error al registrar datos: " + str(e))
-
-        else:
-            self.escribirAlerta("Error. PLC no conectado.")
 
     def showplot(self):
 
