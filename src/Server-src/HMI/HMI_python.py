@@ -10,7 +10,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from snap7.util import get_int, get_real, get_bool, set_int, set_bool, get_dword
 from PyQt5.QtWidgets import (
-    QApplication, QWidget, QGridLayout, QPushButton, QLineEdit, QLabel, QGroupBox, QTextEdit
+    QApplication, QWidget, QGridLayout, QPushButton, QLineEdit, QLabel, QGroupBox, QTextEdit, QComboBox
 )
 from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt
@@ -56,6 +56,7 @@ class HMI(QWidget):
         ahora = datetime.now()
 
         self.identif = ""
+        self.cases = {"" : ""}
 
         self.connected = False  # Declaración de variables utilizadas
         self.texto = 0
@@ -83,13 +84,13 @@ class HMI(QWidget):
         self.controlGroup.setStyleSheet("background-color: #001b1b; color: whitesmoke; border-radius: 10px")
         self.controlGroup.setFont(QFont("Arial", 14))
 
-        self.figure = Figure(figsize=(8, 4), dpi=100)  # Creación de espacio para graficar datos adquiridos del PLC
+        self.figure = Figure(figsize=(6, 4), dpi=100)  # Creación de espacio para graficar datos adquiridos del PLC
         self.canvas = FigureCanvas(self.figure)
 
-        self.figure2 = Figure(figsize=(8, 4), dpi=100)
+        self.figure2 = Figure(figsize=(6, 4), dpi=100)
         self.canvas2 = FigureCanvas(self.figure2)
 
-        self.buttonstart = QPushButton("Leer datos")  # Creación y configuración de elementos incluidos en la GUI
+        self.buttonstart = QPushButton("Iniciar")  # Creación y configuración de elementos incluidos en la GUI
         self.buttonstart.setFont(QFont("Arial", 20))
         self.buttonstart.setFixedSize(160, 80)
         self.buttonstart.setStyleSheet("""
@@ -106,8 +107,8 @@ class HMI(QWidget):
                                   padding: 11px 9px 9px 11px;
                                   }
                                   """)
-        self.buttonstart.clicked.connect(
-            self.actualizar_nombre)  # Llamada a funciones que ejecutan el comportamiento de botones
+        self.buttonstart.clicked.connect(self.actualizar_nombre)  # Llamada a funciones que ejecutan el comportamiento de botones
+
         self.buttonstart.clicked.connect(self.showplot)
 
         self.buttonconnect = QPushButton("Conectar")
@@ -129,7 +130,7 @@ class HMI(QWidget):
                                   """)
         self.buttonconnect.clicked.connect(self.connectPLC)
 
-        self.buttonset = QPushButton("Configurar")
+        self.buttonset = QPushButton("Enviar")
         self.buttonset.setFont(QFont("Arial", 20))
         self.buttonset.setFixedSize(160, 75)
         self.buttonset.setStyleSheet("""
@@ -146,7 +147,7 @@ class HMI(QWidget):
                                   padding: 11px 9px 9px 11px;
                                   }
                                   """)
-        self.buttonset.clicked.connect(self.setSamples)
+        self.buttonset.clicked.connect(self.setParams)
 
         self.buttonload = QPushButton("Guardar datos")
         self.buttonload.setFont(QFont("Arial", 20))
@@ -166,8 +167,6 @@ class HMI(QWidget):
                                   }
                                   """)
         self.buttonload.clicked.connect(self.crear_prueba)
-        #self.buttonload.clicked.connect(self.log_postgresql)
-        # self.buttonload.clicked.connect(self.generar_pdf)
 
         self.buttonimage = QPushButton("Guardar imagen")
         self.buttonimage.setFont(QFont("Arial", 20))
@@ -188,41 +187,167 @@ class HMI(QWidget):
                                   """)
         self.buttonimage.clicked.connect(self.load_image)
 
-        self.label1 = QLabel("Grosor del material [mm]:")
-        self.label1.setFont(QFont("Arial", 16))
+
+        self.labelParams1 = QLabel("Parametros ideales")
+        self.labelParams1.setFont(QFont("Arial", 16))
+        self.labelParams1.setStyleSheet("color: whitesmoke")
+        fuente = self.labelParams1.font()
+        fuente.setUnderline(True)
+        self.labelParams1.setFont(fuente)
+        self.labelParams1.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+
+        self.label1 = QLabel("Corriente:")
+        self.label1.setFont(QFont("Arial", 14))
         self.label1.setStyleSheet("color: whitesmoke")
 
-
-        self.mat1Edit = QLineEdit()  # Bloque de edición para definición de número de muestras a recopilar
-        self.mat1Edit.setPlaceholderText("...")
-        self.mat1Edit.setFont(QFont("Arial", 16))
-        self.mat1Edit.setFixedSize(200, 60)
+        self.mat1Edit = QLabel("5 kA–10 kA")
+        self.mat1Edit.setFont(QFont("Arial", 14))
+        self.mat1Edit.setFixedSize(150, 60)
         self.mat1Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
-        self.mat1Edit.textChanged.connect(self.mat1update)
+        self.mat1Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.label2 = QLabel("Tipo de material:")
-        self.label2.setFont(QFont("Arial", 16))
+        self.label2 = QLabel("Tiempo:")
+        self.label2.setFont(QFont("Arial", 14))
         self.label2.setStyleSheet("color: whitesmoke")
 
-
-        self.mat2Edit = QLineEdit()  # Bloque de edición para definición de número de muestras a recopilar
-        self.mat2Edit.setPlaceholderText("...")
-        self.mat2Edit.setFont(QFont("Arial", 16))
-        self.mat2Edit.setFixedSize(200, 60)
+        self.mat2Edit = QLabel("200 ms–300 ms")
+        self.mat2Edit.setFont(QFont("Arial", 14))
+        self.mat2Edit.setFixedSize(150, 60)
         self.mat2Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
-        self.mat2Edit.textChanged.connect(self.mat2update)
+        self.mat2Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.label3 = QLabel("Diam. de soldadura [mm]:")
-        self.label3.setFont(QFont("Arial", 16))
+        self.label3 = QLabel("Fuerza del electrodo:")
+        self.label3.setFont(QFont("Arial", 14))
         self.label3.setStyleSheet("color: whitesmoke")
 
-
-        self.mat3Edit = QLineEdit()  # Bloque de edición para definición de número de muestras a recopilar
-        self.mat3Edit.setPlaceholderText("...")
-        self.mat3Edit.setFont(QFont("Arial", 16))
-        self.mat3Edit.setFixedSize(200, 60)
+        self.mat3Edit = QLabel("2.0 kN–4.5 kN")
+        self.mat3Edit.setFont(QFont("Arial", 14))
+        self.mat3Edit.setFixedSize(150, 60)
         self.mat3Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
-        self.mat3Edit.textChanged.connect(self.mat3update)
+        self.mat3Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.label4 = QLabel("Tiempo de compresión:")
+        self.label4.setFont(QFont("Arial", 14))
+        self.label4.setStyleSheet("color: whitesmoke")
+
+        self.mat4Edit = QLabel("150 ms–300 ms")
+        self.mat4Edit.setFont(QFont("Arial", 14))
+        self.mat4Edit.setFixedSize(150, 60)
+        self.mat4Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.mat4Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.label5 = QLabel("Pulsos de soldadura:")
+        self.label5.setFont(QFont("Arial", 14))
+        self.label5.setStyleSheet("color: whitesmoke")
+
+        self.mat5Edit = QLabel("1")
+        self.mat5Edit.setFont(QFont("Arial", 14))
+        self.mat5Edit.setFixedSize(150, 60)
+        self.mat5Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.mat5Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.label6 = QLabel("Separación inicial:")
+        self.label6.setFont(QFont("Arial", 14))
+        self.label6.setStyleSheet("color: whitesmoke")
+
+        self.mat6Edit = QLabel("0 mm")
+        self.mat6Edit.setFont(QFont("Arial", 14))
+        self.mat6Edit.setFixedSize(150, 60)
+        self.mat6Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.mat6Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.label7 = QLabel("Proximidad al borde:")
+        self.label7.setFont(QFont("Arial", 14))
+        self.label7.setStyleSheet("color: whitesmoke")
+
+        self.mat7Edit = QLabel("> 6 mm")
+        self.mat7Edit.setFont(QFont("Arial", 14))
+        self.mat7Edit.setFixedSize(150, 60)
+        self.mat7Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.mat7Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.label8 = QLabel("Desalineación angular:")
+        self.label8.setFont(QFont("Arial", 14))
+        self.label8.setStyleSheet("color: whitesmoke")
+
+        self.mat8Edit = QLabel("0◦")
+        self.mat8Edit.setFont(QFont("Arial", 14))
+        self.mat8Edit.setFixedSize(150, 60)
+        self.mat8Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.mat8Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+
+
+        self.labelParams2 = QLabel("Parametros Configurados")
+        self.labelParams2.setFont(QFont("Arial", 16))
+        self.labelParams2.setStyleSheet("color: whitesmoke")
+        fuente = self.labelParams2.font()
+        fuente.setUnderline(True)
+        self.labelParams2.setFont(fuente)
+        self.labelParams2.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+
+
+        self.conf1Edit = QLabel("...")
+        self.conf1Edit.setFont(QFont("Arial", 14))
+        self.conf1Edit.setFixedSize(150, 60)
+        self.conf1Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.conf1Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.conf2Edit = QLabel("...")
+        self.conf2Edit.setFont(QFont("Arial", 14))
+        self.conf2Edit.setFixedSize(150, 60)
+        self.conf2Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.conf2Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.conf3Edit = QLabel("...")
+        self.conf3Edit.setFont(QFont("Arial", 14))
+        self.conf3Edit.setFixedSize(150, 60)
+        self.conf3Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.conf3Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.conf4Edit = QLabel("...")
+        self.conf4Edit.setFont(QFont("Arial", 14))
+        self.conf4Edit.setFixedSize(150, 60)
+        self.conf4Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.conf4Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.conf5Edit = QLabel("...")
+        self.conf5Edit.setFont(QFont("Arial", 14))
+        self.conf5Edit.setFixedSize(150, 60)
+        self.conf5Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.conf5Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.conf6Edit = QLabel("...")
+        self.conf6Edit.setFont(QFont("Arial", 14))
+        self.conf6Edit.setFixedSize(150, 60)
+        self.conf6Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.conf6Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.conf7Edit = QLabel("...")
+        self.conf7Edit.setFont(QFont("Arial", 14))
+        self.conf7Edit.setFixedSize(150, 60)
+        self.conf7Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.conf7Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.conf8Edit = QLabel("...")
+        self.conf8Edit.setFont(QFont("Arial", 14))
+        self.conf8Edit.setFixedSize(150, 60)
+        self.conf8Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.conf8Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.cases = requests.get(f"{self.base_url}/casos").json()
+        nombres = []
+        for m in range(len(self.cases)):
+            nombres.append(self.cases[m].get("Nombre"))
+
+        self.casesCB = QComboBox()
+        self.casesCB.addItems(nombres)
+        self.casesCB.setFont(QFont("Arial", 18))
+        self.casesCB.setStyleSheet("color: black; background-color: silver")
+        self.casesCB.currentTextChanged.connect(self.case_changed)
+        self.casesCB.setFixedSize(160, 75)
+        self.casesCB.setEnabled(False)
+
 
         self.samplesEdit = QLineEdit()  # Bloque de edición para definición de número de muestras a recopilar
         self.samplesEdit.setPlaceholderText("N. de muestras...")
@@ -232,26 +357,49 @@ class HMI(QWidget):
         self.samplesEdit.textChanged.connect(self.updatesamp)
 
         self.alerts = QTextEdit()
+        self.alerts.setMaximumSize(300, 2000)
         self.alerts.setPlaceholderText("...")
-        self.alerts.setFont(QFont("Arial", 14, QFont.Bold))
+        self.alerts.setFont(QFont("Arial", 12, QFont.Bold))
         self.alerts.setStyleSheet("color: black; background-color: silver")
         self.alerts.setReadOnly(True)
 
-        param_layout.addWidget(self.label1, 0, 0)
-        param_layout.addWidget(self.mat1Edit, 0, 1)
-        param_layout.addWidget(self.label2, 1, 0)
-        param_layout.addWidget(self.mat2Edit, 1, 1)
-        param_layout.addWidget(self.label3, 2, 0)
-        param_layout.addWidget(self.mat3Edit, 2, 1)
+        param_layout.addWidget(self.labelParams1, 0, 0, 1, 2, Qt.AlignmentFlag.AlignTop)
+        param_layout.addWidget(self.label1, 1, 0, Qt.AlignmentFlag.AlignTop)
+        param_layout.addWidget(self.mat1Edit, 1, 1, Qt.AlignmentFlag.AlignTop)
+        param_layout.addWidget(self.label2, 2, 0, Qt.AlignmentFlag.AlignTop)
+        param_layout.addWidget(self.mat2Edit, 2, 1, Qt.AlignmentFlag.AlignTop)
+        param_layout.addWidget(self.label3, 3, 0, Qt.AlignmentFlag.AlignTop)
+        param_layout.addWidget(self.mat3Edit, 3, 1, Qt.AlignmentFlag.AlignTop)
+        param_layout.addWidget(self.label4, 4, 0, Qt.AlignmentFlag.AlignTop)
+        param_layout.addWidget(self.mat4Edit, 4, 1, Qt.AlignmentFlag.AlignTop)
+        param_layout.addWidget(self.label5, 5, 0, Qt.AlignmentFlag.AlignTop)
+        param_layout.addWidget(self.mat5Edit, 5, 1, Qt.AlignmentFlag.AlignTop)
+        param_layout.addWidget(self.label6, 6, 0, Qt.AlignmentFlag.AlignTop)
+        param_layout.addWidget(self.mat6Edit, 6, 1, Qt.AlignmentFlag.AlignTop)
+        param_layout.addWidget(self.label7, 7, 0, Qt.AlignmentFlag.AlignTop)
+        param_layout.addWidget(self.mat7Edit, 7, 1, Qt.AlignmentFlag.AlignTop)
+        param_layout.addWidget(self.label8, 8, 0, Qt.AlignmentFlag.AlignTop)
+        param_layout.addWidget(self.mat8Edit, 8, 1, Qt.AlignmentFlag.AlignTop)
+
+        param_layout.addWidget(self.labelParams2, 0, 2, Qt.AlignmentFlag.AlignTop)
+        param_layout.addWidget(self.conf1Edit, 1, 2, Qt.AlignmentFlag.AlignTop)
+        param_layout.addWidget(self.conf2Edit, 2, 2, Qt.AlignmentFlag.AlignTop)
+        param_layout.addWidget(self.conf3Edit, 3, 2, Qt.AlignmentFlag.AlignTop)
+        param_layout.addWidget(self.conf4Edit, 4, 2, Qt.AlignmentFlag.AlignTop)
+        param_layout.addWidget(self.conf5Edit, 5, 2, Qt.AlignmentFlag.AlignTop)
+        param_layout.addWidget(self.conf6Edit, 6, 2, Qt.AlignmentFlag.AlignTop)
+        param_layout.addWidget(self.conf7Edit, 7, 2, Qt.AlignmentFlag.AlignTop)
+        param_layout.addWidget(self.conf8Edit, 8, 2, Qt.AlignmentFlag.AlignTop)
 
         self.paramGroup.setLayout(param_layout)
 
-        cntrl_layout.addWidget(self.buttonstart, 0, 0)
-        cntrl_layout.addWidget(self.buttonconnect, 0, 1)
+        cntrl_layout.addWidget(self.buttonstart, 0, 4)
+        cntrl_layout.addWidget(self.buttonconnect, 0, 0)
+        cntrl_layout.addWidget(self.casesCB, 0, 1)
         cntrl_layout.addWidget(self.samplesEdit, 0, 2)
         cntrl_layout.addWidget(self.buttonset, 0, 3)
-        cntrl_layout.addWidget(self.buttonload, 0, 4)
-        cntrl_layout.addWidget(self.buttonimage, 0, 5)
+        cntrl_layout.addWidget(self.buttonload, 0, 5)
+        cntrl_layout.addWidget(self.buttonimage, 0, 6)
 
         self.controlGroup.setLayout(cntrl_layout)
 
@@ -313,18 +461,24 @@ class HMI(QWidget):
         set_bool(data, 0, bit, value)
         self.plc.db_write(db, byte_offset, data)
 
-    def obtener_pruebas(self):
-        return requests.get(f"{self.base_url}/pruebas").json()
+    def case_changed(self, texto):
+        try:
+            index = []
+            for n in range(len(self.cases)):
+                casos = self.cases[m].get("Nombre")
+                index.append()
+
+            caso = requests.get(f"{self.base_url}/casos/" + index).json()
+            print(texto)
+
+
+        except Exception as e:
+            self.escribirAlerta("Error. Error al solicitar casos: " + str(e))
+
 
     def crear_prueba(self):
         if self.connected:
             try:
-
-                id_array = [0] * len(self.time_array)
-                id_enviado = False
-
-                for i in range(len(self.time_array)):
-                    id_array[i] = self.identif
 
                 self.datos = {
                       "Id": self.identif,
@@ -341,11 +495,6 @@ class HMI(QWidget):
                 requests.post(f"{self.base_url}/pruebas", json=self.datos).json()
 
                 for m in range(len(self.time_array)):
-                    if m > 0:
-                        id_enviado = True
-
-                    if id_enviado:
-                        self.identif = ""
 
                     self.datos_2 = {
                         "Id" : self.identif,
@@ -359,8 +508,7 @@ class HMI(QWidget):
                 self.escribirAlerta("Datos registrados correctamente ✓")
 
             except Exception as e:
-                #self.escribirAlerta("Error. Error al registrar datos: " + str(e))
-                print(e)
+                self.escribirAlerta("Error. Error al registrar datos: " + str(e))
 
         else:
             self.escribirAlerta("Error. PLC no conectado.")
@@ -373,6 +521,7 @@ class HMI(QWidget):
             self.plc.connect("192.168.0.1", rack=0, slot=1)
 
             self.connected = True
+            self.casesCB.setEnabled(True)
             self.alerts.setPlainText("Conectado a PLC.")
             self.buttonconnect.setStyleSheet("background-color: green")
 
@@ -380,42 +529,21 @@ class HMI(QWidget):
             self.buttonconnect.setStyleSheet("background-color: red")
             self.escribirAlerta("Error. Error al conectar: " + str(e))
 
+
     def escribirAlerta(self, texto):
         texto_actual = self.alerts.toPlainText()
         # Insertar nuevo texto antes del existente
         self.alerts.setPlainText(">" + texto + "\n" + "\n" + texto_actual)
 
     def load_image(self):
-        self.figure.savefig(self.nombre1)
-        self.figure2.savefig(self.nombre2)
-        self.escribirAlerta("Imágenes guardadas. ✓")
+        if self.connected:
+            self.figure.savefig(self.nombre1)
+            self.figure2.savefig(self.nombre2)
+            self.escribirAlerta("Imágenes guardadas. ✓")
 
-    def mat1update(self, text):  # Funciones para comportamiento de botones y conexión a PLC
+        else:
+            self.escribirAlerta("Error. PLC no conectado.")
 
-        if text != "":
-            try:
-                num = text
-                self.mat1 = float(num)
-            except Exception:
-                self.escribirAlerta("Error. En este campo solo puede ingresar números.")
-
-                self.mat1Edit.setText("")
-
-    def mat2update(self, text):  # Funciones para comportamiento de botones y conexión a PLC
-
-        if text != "":
-            self.mat2 = text
-
-    def mat3update(self, text):  # Funciones para comportamiento de botones y conexión a PLC
-
-        if text != "":
-            try:
-                num = text
-                self.mat3 = float(num)
-
-            except Exception:
-                self.escribirAlerta("Error. En este campo solo puede ingresar números.")
-                self.mat3Edit.setText("")
 
     def updatesamp(self, text):  # Funciones para comportamiento de botones y conexión a PLC
         if text != "":
@@ -426,15 +554,17 @@ class HMI(QWidget):
                 self.escribirAlerta("Error. En este campo solo puede ingresar números enteros.")
                 self.samplesEdit.setText("")
 
-    def setSamples(self):
+    def setParams(self):
         if self.connected:
             try:
+
                 num = self.texto
                 self.write_int(db_number=12, byte_offset=0, value=num)
-                self.escribirAlerta("Número de muestras configurado ✓")
+                #self.write_real() # Enviar tiempo de soldadura
+                self.escribirAlerta("Parametros configurados ✓")
 
             except Exception as e:
-                self.escribirAlerta("Error. Error al enviar datos")
+                self.escribirAlerta("Error. Error al enviar datos: " + str(e))
         else:
             self.escribirAlerta("Error. PLC no conectado.")
 
