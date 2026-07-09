@@ -9,8 +9,10 @@ matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from snap7.util import get_int, get_real, get_bool, set_int, set_bool, get_dword
+from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import (
-    QApplication, QWidget, QGridLayout, QPushButton, QLineEdit, QLabel, QGroupBox, QTextEdit, QComboBox
+    QApplication, QWidget, QGridLayout, QPushButton, QLineEdit, QLabel, QGroupBox,
+    QTextEdit, QComboBox, QTabWidget, QMainWindow, QTableWidget, QTableWidgetItem
 )
 from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt
@@ -18,20 +20,34 @@ from datetime import datetime
 
 
 # Inicialización de interfaz gráfica
-class HMI(QWidget):
+class HMI(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("PLC Plotter")  # Configuración de la ventana de la GUI
-        # self.setFixedSize(1300, 600)
         self.setStyleSheet("background-color: #001b1b")
 
+        # Crear el widget de pestañas principal
+        self.tabs = QTabWidget()
+        self.setCentralWidget(self.tabs)
 
-        main_layout = QGridLayout(self)  # Distribución de rejilla, renglones y columnas
+        # --- Pestaña 1 ---
+        self.pestana1 = QWidget()
+
+        # --- Pestaña 2 ---
+        self.pestana2 = QWidget()
+        self.layout_pestana2 = QGridLayout()
+
+        main_layout = QGridLayout()  # Distribución de rejilla, renglones y columnas
         main_layout.setContentsMargins(10, 10, 10, 10)
         param_layout = QGridLayout()
         param_layout.setContentsMargins(10, 20, 10, 20)
         cntrl_layout = QGridLayout()
         cntrl_layout.setContentsMargins(10, 20, 10, 20)
+
+        cntrl2_layout = QGridLayout()
+        cntrl2_layout.setContentsMargins(10, 20, 10, 20)
+        casos_layout = QGridLayout()
+        casos_layout.setContentsMargins(5, 5, 5, 5)
 
         self.base_url = "http://192.168.2.199:8000"
         self.datos = {
@@ -71,9 +87,9 @@ class HMI(QWidget):
         self.mat1 = 0
         self.mat2 = ""
         self.mat3 = ""
-        self.force_array = [0, 1, 2, 4, 5, 4, 2, 1, 0]
-        self.time_array = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-        self.current_array = [0, 1, 2, 1, 0, 1, 2, 1, 0]
+        self.force_array = []
+        self.time_array = []
+        self.current_array = []
         self.fecha_formateada = ahora.strftime("%d-%m-%Y-%H-%M-%S")
 
         self.plc = snap7.client.Client()  # Creación de objeto para comunicación con PLC Siemens S7-1200
@@ -85,6 +101,15 @@ class HMI(QWidget):
         self.controlGroup = QGroupBox("Control")
         self.controlGroup.setStyleSheet("background-color: #001b1b; color: whitesmoke; border-radius: 10px")
         self.controlGroup.setFont(QFont("Arial", 14))
+
+        self.casosGroup = QGroupBox("Casos")
+        self.casosGroup.setStyleSheet("background-color: #001b1b; color: whitesmoke; border-radius: 10px")
+        self.casosGroup.setFont(QFont("Arial", 14))
+
+        self.control2Group = QGroupBox("Control")
+        self.control2Group.setStyleSheet("background-color: #001b1b; color: whitesmoke; border-radius: 10px")
+        self.control2Group.setFont(QFont("Arial", 14))
+        self.control2Group.setMaximumSize(2000, 450)
 
         self.figure = Figure(figsize=(6, 4), dpi=100)  # Creación de espacio para graficar datos adquiridos del PLC
         self.canvas = FigureCanvas(self.figure)
@@ -348,7 +373,7 @@ class HMI(QWidget):
         self.casesCB.setStyleSheet("color: black; background-color: silver")
         self.casesCB.currentTextChanged.connect(self.case_changed)
         self.casesCB.setFixedSize(160, 75)
-        self.casesCB.setEnabled(False)
+        self.casesCB.setEnabled(True)
 
 
         self.samplesEdit = QLineEdit()  # Bloque de edición para definición de número de muestras a recopilar
@@ -364,6 +389,113 @@ class HMI(QWidget):
         self.alerts.setFont(QFont("Arial", 12, QFont.Bold))
         self.alerts.setStyleSheet("color: black; background-color: silver")
         self.alerts.setReadOnly(True)
+
+        # Pestaña 2
+        self.buttonNuevo = QPushButton("Nuevo")
+        self.buttonNuevo.setFont(QFont("Arial", 20))
+        self.buttonNuevo.setFixedSize(220, 75)
+        self.buttonNuevo.setStyleSheet("""
+                                          QPushButton {
+                                          background-color: darkslategrey; 
+                                          color: silver; border: none; 
+                                          border-radius: 20px; 
+                                          padding: 10px 10px
+                                          }
+                                          QPushButton:hover {
+                                          background-color: darkgrey;
+                                          }
+                                          QPushButton:pressed {
+                                          padding: 11px 9px 9px 11px;
+                                          }
+                                          """)
+        #self.buttonNuevo.clicked.connect(self.nuevo_caso)
+
+        self.buttonBuscar = QPushButton("Buscar")
+        self.buttonBuscar.setFont(QFont("Arial", 20))
+        self.buttonBuscar.setFixedSize(220, 75)
+        self.buttonBuscar.setStyleSheet("""
+                                          QPushButton {
+                                          background-color: darkslategrey; 
+                                          color: silver; border: none; 
+                                          border-radius: 20px; 
+                                          padding: 10px 10px
+                                          }
+                                          QPushButton:hover {
+                                          background-color: darkgrey;
+                                          }
+                                          QPushButton:pressed {
+                                          padding: 11px 9px 9px 11px;
+                                          }
+                                          """)
+        #self.buttonBuscar.clicked.connect(self.buscar_caso)
+
+        self.buttonSave = QPushButton("Guardar")
+        self.buttonSave.setFont(QFont("Arial", 20))
+        self.buttonSave.setFixedSize(220, 75)
+        self.buttonSave.setStyleSheet("""
+                                          QPushButton {
+                                          background-color: darkslategrey; 
+                                          color: silver; border: none; 
+                                          border-radius: 20px; 
+                                          padding: 10px 10px
+                                          }
+                                          QPushButton:hover {
+                                          background-color: darkgrey;
+                                          }
+                                          QPushButton:pressed {
+                                          padding: 11px 9px 9px 11px;
+                                          }
+                                          """)
+        #self.buttonGuardar.clicked.connect(self.guardar_caso)
+
+        self.buttonBorrar = QPushButton("Borrar")
+        self.buttonBorrar.setFont(QFont("Arial", 20))
+        self.buttonBorrar.setFixedSize(220, 75)
+        self.buttonBorrar.setStyleSheet("""
+                                          QPushButton {
+                                          background-color: darkslategrey; 
+                                          color: silver; border: none; 
+                                          border-radius: 20px; 
+                                          padding: 10px 10px
+                                          }
+                                          QPushButton:hover {
+                                          background-color: darkgrey;
+                                          }
+                                          QPushButton:pressed {
+                                          padding: 11px 9px 9px 11px;
+                                          }
+                                          """)
+        #self.buttonBorrar.clicked.connect(self.borrar_caso)
+
+
+        self.tablaCasos = QTableWidget(9, 2)
+        self.tablaCasos.setFont(QFont("Arial", 14))
+        self.tablaCasos.resize(1400, 640)
+        self.tablaCasos.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.tablaCasos.setColumnWidth(0, 700)
+        self.tablaCasos.setColumnWidth(1, 700)
+
+        # Establecer la altura de la primera fila (índice 0) a 50 píxeles
+        self.tablaCasos.setRowHeight(0, 80)
+        self.tablaCasos.setRowHeight(1, 80)
+        self.tablaCasos.setRowHeight(2, 80)
+        self.tablaCasos.setRowHeight(3, 80)
+        self.tablaCasos.setRowHeight(4, 80)
+        self.tablaCasos.setRowHeight(5, 80)
+        self.tablaCasos.setRowHeight(6, 80)
+        self.tablaCasos.setRowHeight(7, 80)
+        self.tablaCasos.setRowHeight(8, 80)
+
+        self.tablaCasos.setItem(0, 0, QTableWidgetItem("Nombre"))
+        self.tablaCasos.setItem(1, 0, QTableWidgetItem("Tiempo"))
+        self.tablaCasos.setItem(2, 0, QTableWidgetItem("Fuerza"))
+        self.tablaCasos.setItem(3, 0, QTableWidgetItem("Compresión"))
+        self.tablaCasos.setItem(4, 0, QTableWidgetItem("Pulsos"))
+        self.tablaCasos.setItem(5, 0, QTableWidgetItem("Material"))
+        self.tablaCasos.setItem(6, 0, QTableWidgetItem("Grosor"))
+        self.tablaCasos.setItem(7, 0, QTableWidgetItem("Separación"))
+        self.tablaCasos.setItem(8, 0, QTableWidgetItem("Proximidad"))
+
 
         param_layout.addWidget(self.labelParams1, 0, 0, 1, 2, Qt.AlignmentFlag.AlignTop)
         param_layout.addWidget(self.label1, 1, 0, Qt.AlignmentFlag.AlignTop)
@@ -405,11 +537,36 @@ class HMI(QWidget):
 
         self.controlGroup.setLayout(cntrl_layout)
 
-        main_layout.addWidget(self.paramGroup, 0, 0, 2, 1)
-        main_layout.addWidget(self.controlGroup, 2, 0, 1, 3)
-        main_layout.addWidget(self.canvas, 0, 1, 1, 1)
-        main_layout.addWidget(self.canvas2, 1, 1, 1, 1)
-        main_layout.addWidget(self.alerts, 0, 2, 2, 1)
+        main_layout.addWidget(self.paramGroup, 1, 0, 2, 1)
+        main_layout.addWidget(self.controlGroup, 0, 0, 1, 3)
+        main_layout.addWidget(self.canvas, 1, 1, 1, 1)
+        main_layout.addWidget(self.canvas2, 2, 1, 1, 1)
+        main_layout.addWidget(self.alerts, 1, 2, 2, 1)
+
+
+        # Pestaña 2
+
+        cntrl2_layout.addWidget(self.buttonNuevo, 0, 0)
+        cntrl2_layout.addWidget(self.buttonBuscar, 0, 1)
+        cntrl2_layout.addWidget(self.buttonSave, 0, 2)
+        cntrl2_layout.addWidget(self.buttonBorrar, 0, 3)
+
+
+        self.control2Group.setLayout(cntrl2_layout)
+
+
+        self.layout_pestana2.addWidget(self.control2Group, 0, 0)
+        self.layout_pestana2.addWidget(self.tablaCasos, 1, 0)
+
+        self.pestana2.setLayout(self.layout_pestana2)
+
+        self.pestana1.setLayout(main_layout)
+
+        self.tabs.addTab(self.pestana1, "Inicio")
+        self.tabs.addTab(self.pestana2, "Configuración")
+        self.tabs.setStyleSheet("color: whitesmoke")
+        self.tabs.setFont(QFont("Arial", 14))
+
 
     def write_int(self, db_number, byte_offset, value: int):  # Funciones para comunicación GUI <-> PLC
         data = bytearray(2)
@@ -482,7 +639,7 @@ class HMI(QWidget):
             self.conf5Edit.setText(str(caso.get("Material")))
             self.conf6Edit.setText(str(caso.get("Grosor")))
             self.conf7Edit.setText(str(caso.get("Separacion")))
-            self.conf7Edit.setText(str(caso.get("Proximidad")))
+            self.conf8Edit.setText(str(caso.get("Proximidad")))
 
 
         except Exception as e:
