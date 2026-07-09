@@ -8,19 +8,15 @@ class PruebasCETEVI(Base):
 
     Id = Column(String(300), primary_key=True)
 
+    Caso = Column(String)
+
     Muestras = Column(Integer)
 
     Tiempo = Column(Float)
 
-    Orientacion = Column(String(300))
-
     FMax = Column(Float)
 
     IMax = Column(Float)
-
-    Grosor = Column(Float)
-
-    Material = Column(String(300))
 
     Diametro = Column(Float)
 

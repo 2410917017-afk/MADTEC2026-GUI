@@ -12,6 +12,8 @@ class DatosCETEVI(Base):
         String
     )
 
+    Caso = Column(String)
+
     Tiempo = Column(Float)
 
     Fuerza = Column(Float)

@@ -4,6 +4,7 @@ from pydantic import BaseModel
 class DatosBase(BaseModel):
 
     Id: str
+    Caso: str
     Tiempo: float
     Fuerza: float
     Corriente: float

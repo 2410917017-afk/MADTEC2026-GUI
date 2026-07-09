@@ -16,13 +16,11 @@ def crear_prueba(prueba: PruebaCreate, db: Session = Depends(get_db)):
     nueva = PruebasCETEVI(
 
         Id=prueba.Id,
+        Caso=prueba.Cas0,
         Muestras=prueba.Muestras,
         Tiempo=prueba.Tiempo,
-        Orientacion=prueba.Orientacion,
         FMax=prueba.FMax,
         IMax=prueba.IMax,
-        Grosor=prueba.Grosor,
-        Material=prueba.Material,
         Diametro=prueba.Diametro
     )
 

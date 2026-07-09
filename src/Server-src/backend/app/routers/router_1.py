@@ -17,6 +17,7 @@ def crear_dato(dato: DatosCreate, db: Session = Depends(get_db)):
     nuevo = DatosCETEVI(
 
         Id=dato.Id,
+        Caso=dato.Caso,
         Tiempo=dato.Tiempo,
         Fuerza=dato.Fuerza,
         Corriente=dato.Corriente

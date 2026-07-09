@@ -2,9 +2,9 @@
 # Incluye interfaz gráfica simple para el muestreo y graficación de datos, así como guardar las gráficas en una carpeta dedicada.
 # Comandos para instalar librerías requeridas, contando ya con Python (usamos versión 3.10.0):
 
-# pip install matplotlib python-snap7 PyQt5 psycopg2-binary
+# pip install matplotlib python-snap7 PyQt5 psycopg2-binary request
 
-import sys, matplotlib.pyplot as plt, snap7, psycopg2, psycopg2.extras, matplotlib, requests
+import sys, snap7, matplotlib, requests
 matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -35,19 +35,21 @@ class HMI(QWidget):
 
         self.base_url = "http://192.168.2.199:8000"
         self.datos = {
-              "Id": "",
-              "Muestras": 0,
-              "Tiempo": 0,
+              "Id" : "",
+              "Caso" : "",
+              "Muestras" : 0,
+              "Tiempo" : 0,
               "Orientacion": "",
-              "FMax": 0,
-              "IMax": 0,
-              "Grosor": 0,
-              "Material": "",
-              "Diametro": 0
+              "FMax" : 0,
+              "IMax" : 0,
+              "Grosor" : 0,
+              "Material" : "",
+              "Diametro" : 0
             }
 
         self.datos_2 = {
             "Id" : "",
+            "Caso" : "",
             "Tiempo" : 0,
             "Fuerza" : 0,
             "Corriente" : 0
@@ -196,81 +198,81 @@ class HMI(QWidget):
         self.labelParams1.setFont(fuente)
         self.labelParams1.setAlignment(Qt.AlignmentFlag.AlignHCenter)
 
-        self.label1 = QLabel("Corriente:")
+        self.label1 = QLabel("Tiempo:")
         self.label1.setFont(QFont("Arial", 14))
         self.label1.setStyleSheet("color: whitesmoke")
 
-        self.mat1Edit = QLabel("5 kA–10 kA")
+        self.mat1Edit = QLabel("200ms-300ms")
         self.mat1Edit.setFont(QFont("Arial", 14))
         self.mat1Edit.setFixedSize(150, 60)
         self.mat1Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
         self.mat1Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.label2 = QLabel("Tiempo:")
+        self.label2 = QLabel("Fuerza:")
         self.label2.setFont(QFont("Arial", 14))
         self.label2.setStyleSheet("color: whitesmoke")
 
-        self.mat2Edit = QLabel("200 ms–300 ms")
+        self.mat2Edit = QLabel("2.0 kN–4.5 kN")
         self.mat2Edit.setFont(QFont("Arial", 14))
         self.mat2Edit.setFixedSize(150, 60)
         self.mat2Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
         self.mat2Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.label3 = QLabel("Fuerza del electrodo:")
+        self.label3 = QLabel("Tiempo de compresión:")
         self.label3.setFont(QFont("Arial", 14))
         self.label3.setStyleSheet("color: whitesmoke")
 
-        self.mat3Edit = QLabel("2.0 kN–4.5 kN")
+        self.mat3Edit = QLabel("150 ms–300 ms")
         self.mat3Edit.setFont(QFont("Arial", 14))
         self.mat3Edit.setFixedSize(150, 60)
         self.mat3Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
         self.mat3Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.label4 = QLabel("Tiempo de compresión:")
+        self.label4 = QLabel("Pulsos:")
         self.label4.setFont(QFont("Arial", 14))
         self.label4.setStyleSheet("color: whitesmoke")
 
-        self.mat4Edit = QLabel("150 ms–300 ms")
+        self.mat4Edit = QLabel("1")
         self.mat4Edit.setFont(QFont("Arial", 14))
         self.mat4Edit.setFixedSize(150, 60)
         self.mat4Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
         self.mat4Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.label5 = QLabel("Pulsos de soldadura:")
+        self.label5 = QLabel("Material:")
         self.label5.setFont(QFont("Arial", 14))
         self.label5.setStyleSheet("color: whitesmoke")
 
-        self.mat5Edit = QLabel("1")
+        self.mat5Edit = QLabel("Acero")
         self.mat5Edit.setFont(QFont("Arial", 14))
         self.mat5Edit.setFixedSize(150, 60)
         self.mat5Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
         self.mat5Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.label6 = QLabel("Separación inicial:")
+        self.label6 = QLabel("Grosor:")
         self.label6.setFont(QFont("Arial", 14))
         self.label6.setStyleSheet("color: whitesmoke")
 
-        self.mat6Edit = QLabel("0 mm")
+        self.mat6Edit = QLabel("0.4mm-0.8mm")
         self.mat6Edit.setFont(QFont("Arial", 14))
         self.mat6Edit.setFixedSize(150, 60)
         self.mat6Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
         self.mat6Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.label7 = QLabel("Proximidad al borde:")
+        self.label7 = QLabel("Separación:")
         self.label7.setFont(QFont("Arial", 14))
         self.label7.setStyleSheet("color: whitesmoke")
 
-        self.mat7Edit = QLabel("> 6 mm")
+        self.mat7Edit = QLabel("0")
         self.mat7Edit.setFont(QFont("Arial", 14))
         self.mat7Edit.setFixedSize(150, 60)
         self.mat7Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
         self.mat7Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.label8 = QLabel("Desalineación angular:")
+        self.label8 = QLabel("Proximidad:")
         self.label8.setFont(QFont("Arial", 14))
         self.label8.setStyleSheet("color: whitesmoke")
 
-        self.mat8Edit = QLabel("0◦")
+        self.mat8Edit = QLabel("> 6mm")
         self.mat8Edit.setFont(QFont("Arial", 14))
         self.mat8Edit.setFixedSize(150, 60)
         self.mat8Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
@@ -463,13 +465,24 @@ class HMI(QWidget):
 
     def case_changed(self, texto):
         try:
-            index = []
+            index = ""
             for n in range(len(self.cases)):
-                casos = self.cases[m].get("Nombre")
-                index.append()
+                casos = self.cases[n].get("Nombre")
+                if casos == self.casesCB.currentText():
+
+                    index = str(self.cases[n].get("id"))
 
             caso = requests.get(f"{self.base_url}/casos/" + index).json()
-            print(texto)
+            print(caso)
+
+            self.conf1Edit.setText(str(caso.get("Tiempo")))
+            self.conf2Edit.setText(str(caso.get("Fuerza")))
+            self.conf3Edit.setText(str(caso.get("Compresion")))
+            self.conf4Edit.setText(str(caso.get("Pulsos")))
+            self.conf5Edit.setText(str(caso.get("Material")))
+            self.conf6Edit.setText(str(caso.get("Grosor")))
+            self.conf7Edit.setText(str(caso.get("Separacion")))
+            self.conf7Edit.setText(str(caso.get("Proximidad")))
 
 
         except Exception as e:
@@ -482,13 +495,11 @@ class HMI(QWidget):
 
                 self.datos = {
                       "Id": self.identif,
+                      "Caso": self.casesCB.currentText(),
                       "Muestras": self.texto,
                       "Tiempo": self.tSoldadura,
-                      "Orientacion": "string",
                       "FMax": self.max,
                       "IMax": self.maxcurr,
-                      "Grosor": self.mat1,
-                      "Material": self.mat2,
                       "Diametro": self.mat3
                 }
 
@@ -498,6 +509,7 @@ class HMI(QWidget):
 
                     self.datos_2 = {
                         "Id" : self.identif,
+                        "Caso" : self.casesCB.currentText(),
                         "Tiempo" : self.time_array[m],
                         "Fuerza" : self.force_array[m],
                         "Corriente" : self.current_array[m]

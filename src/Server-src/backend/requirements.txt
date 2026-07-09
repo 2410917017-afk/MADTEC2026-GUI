@@ -6,3 +6,7 @@ psycopg[binary]
 pydantic
 python-dotenv
 alembic
+matplotlib
+python-snap7
+pyqt5
+request

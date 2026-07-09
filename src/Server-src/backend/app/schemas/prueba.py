@@ -3,13 +3,11 @@ from pydantic import BaseModel
 
 class PruebaBase(BaseModel):
     Id: str
+    Caso: str
     Muestras: int
     Tiempo: float
-    Orientacion: str
     FMax: float
     IMax: float
-    Grosor: float
-    Material: str
     Diametro: float
 
 
