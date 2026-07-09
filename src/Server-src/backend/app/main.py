@@ -4,6 +4,7 @@ from app.database.database import Base
 from contextlib import asynccontextmanager
 from app.routers import router_1
 from app.routers import pruebas
+from app.routers import casos
 
 import app.models
 
@@ -19,6 +20,7 @@ app = FastAPI(
 
 app.include_router(router_1.router)
 app.include_router(pruebas.router)
+app.include_router(casos.router)
 
 @app.get("/")
 async def root():
