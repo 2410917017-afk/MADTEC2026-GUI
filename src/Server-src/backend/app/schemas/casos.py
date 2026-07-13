@@ -17,6 +17,9 @@ class CasoBase(BaseModel):
 class CasoCreate(CasoBase):
     pass
 
+class CasoUpdate(CasoBase):
+    pass
+
 
 class CasoResponse(CasoBase):
     id: int

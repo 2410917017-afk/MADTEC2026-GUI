@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.database.database import get_db
 from app.models.caso import CasoSoldadura
 
-from app.schemas.casos import CasoCreate, CasoResponse
+from app.schemas.casos import CasoCreate, CasoResponse, CasoUpdate
 
 router = APIRouter(
     prefix="/casos",
@@ -32,6 +32,57 @@ def crear_caso(caso: CasoCreate, db: Session = Depends(get_db)):
     db.refresh(nuevo)
 
     return nuevo
+
+@router.put("/{id}", response_model=CasoResponse)
+def actualizar_caso(
+    id: int,
+    datos: CasoUpdate,
+    db: Session = Depends(get_db)
+):
+
+    caso = db.query(CasoSoldadura).filter(
+        CasoSoldadura.id == id
+    ).first()
+
+    if caso is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Caso no encontrado"
+        )
+
+    caso.nombre = datos.nombre
+    caso.descripcion = datos.descripcion
+    caso.material = datos.material
+    caso.espesor = datos.espesor
+    caso.diametro = datos.diametro
+    caso.corriente = datos.corriente
+    caso.fuerza = datos.fuerza
+    caso.tiempo = datos.tiempo
+    caso.observaciones = datos.observaciones
+    caso.activo = datos.activo
+
+    db.commit()
+    db.refresh(caso)
+
+    return caso
+
+@router.delete("/{id_caso}")
+def eliminar_caso(id_caso: int, db: Session = Depends(get_db)):
+
+    caso = db.query(CasoSoldadura).filter(
+        CasoSoldadura.id_caso == id_caso
+    ).first()
+
+    if caso is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Caso no encontrado"
+        )
+
+    db.delete(caso)
+    db.commit()
+
+    return {"mensaje": "Caso eliminado correctamente"}
 
 @router.get("/", response_model=list[CasoResponse])
 def obtener_casos(db: Session = Depends(get_db)):

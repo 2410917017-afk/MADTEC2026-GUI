@@ -4,15 +4,14 @@
 
 # pip install matplotlib python-snap7 PyQt5 psycopg2-binary request
 
-import sys, snap7, matplotlib, requests, time, serial
+import sys, snap7, matplotlib, requests, time, serial, json
 matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from snap7.util import get_int, get_real, get_bool, set_int, set_bool, get_dword
-from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QGridLayout, QPushButton, QLineEdit, QLabel, QGroupBox,
-    QTextEdit, QComboBox, QTabWidget, QMainWindow, QTableWidget, QTableWidgetItem, QTableWidgetItem
+    QTextEdit, QComboBox, QTabWidget, QMainWindow, QTableWidget, QMessageBox, QTableWidgetItem
 )
 from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt
@@ -24,7 +23,7 @@ class HMI(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("PLC Plotter")  # Configuración de la ventana de la GUI
-        self.setStyleSheet("background-color: #060c06")
+        self.setStyleSheet("background-color: #060c06; color: white")
 
         # Crear el widget de pestañas principal
         self.tabs = QTabWidget()
@@ -52,6 +51,8 @@ class HMI(QMainWindow):
         self.base_url = "http://192.168.2.199:8000"
         self.puerto = '/dev/ttyUSB0'
         self.baudios = 9600
+        self.busqueda = None
+        self.ser = None
 
         self.datos = {
               "Id" : "",
@@ -79,6 +80,8 @@ class HMI(QMainWindow):
         self.identif = ""
         self.cases = {"" : ""}
 
+        self.confirm = False
+
         self.connected = False  # Declaración de variables utilizadas
         self.texto = 0
         self.index = 0
@@ -95,7 +98,10 @@ class HMI(QMainWindow):
         self.current_array = []
         self.fecha_formateada = ahora.strftime("%d-%m-%Y-%H-%M-%S")
 
-        self.plc = snap7.client.Client()  # Creación de objeto para comunicación con PLC Siemens S7-1200
+        self.plc = snap7.client.Client()
+
+        self.alerts = alertas()
+        self.alerts2 = alertas()
 
         self.paramGroup = QGroupBox("Parametros")
         self.paramGroup.setStyleSheet("background-color: #1e1e1e; color: whitesmoke; border-radius: 10px")
@@ -368,12 +374,15 @@ class HMI(QMainWindow):
         self.conf8Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.cases = requests.get(f"{self.base_url}/casos").json()
-        nombres = []
+        self.nombres = []
+        self.indices = []
+
         for m in range(len(self.cases)):
-            nombres.append(self.cases[m].get("Nombre"))
+            self.nombres.append(self.cases[m].get("Nombre"))
+            self.indices.append(self.cases[m].get("id"))
 
         self.casesCB = QComboBox()
-        self.casesCB.addItems(nombres)
+        self.casesCB.addItems(self.nombres)
         self.casesCB.setFont(QFont("Arial", 18))
         self.casesCB.setStyleSheet("color: #dddcde; background-color: #5e5e5e")
         self.casesCB.currentTextChanged.connect(self.case_changed)
@@ -388,12 +397,6 @@ class HMI(QMainWindow):
         self.samplesEdit.setStyleSheet("color: #dddcde; background-color: #5e5e5e")
         self.samplesEdit.textChanged.connect(self.updatesamp)
 
-        self.alerts = QTextEdit()
-        self.alerts.setMaximumSize(300, 2000)
-        self.alerts.setPlaceholderText("...")
-        self.alerts.setFont(QFont("Arial", 12, QFont.Bold))
-        self.alerts.setStyleSheet("color: #dddcde; background-color: #5e5e5e; border-radius: 10px; ")
-        self.alerts.setReadOnly(True)
 
         # Pestaña 2
         self.buttonNuevo = QPushButton("Nuevo")
@@ -415,24 +418,6 @@ class HMI(QMainWindow):
                                           """)
         self.buttonNuevo.clicked.connect(self.nuevo_caso)
 
-        self.buttonBuscar = QPushButton("Buscar")
-        self.buttonBuscar.setFont(QFont("Arial", 20))
-        self.buttonBuscar.setFixedSize(220, 75)
-        self.buttonBuscar.setStyleSheet("""
-                                          QPushButton {
-                                          background-color: #494be7; 
-                                          color: #dddcde; border: none; 
-                                          border-radius: 34px; 
-                                          padding: 10px 10px
-                                          }
-                                          QPushButton:hover {
-                                          background-color: #9193FF;
-                                          }
-                                          QPushButton:pressed {
-                                          padding: 11px 9px 9px 11px;
-                                          }
-                                          """)
-        #self.buttonBuscar.clicked.connect(self.buscar_caso)
 
         self.buttonSave = QPushButton("Guardar")
         self.buttonSave.setFont(QFont("Arial", 20))
@@ -451,7 +436,8 @@ class HMI(QMainWindow):
                                           padding: 11px 9px 9px 11px;
                                           }
                                           """)
-        #self.buttonGuardar.clicked.connect(self.guardar_caso)
+        self.buttonSave.clicked.connect(self.mostrar_confirmacion)
+        self.buttonSave.clicked.connect(self.guardar_caso)
 
         self.buttonBorrar = QPushButton("Borrar")
         self.buttonBorrar.setFont(QFont("Arial", 20))
@@ -473,57 +459,67 @@ class HMI(QMainWindow):
                                           """)
         #self.buttonBorrar.clicked.connect(self.borrar_caso)
 
-
-        self.tablaCasos = QTableWidget(9, 2)
+        self.tablaCasos = QTableWidget(len(self.cases), 10)
         self.tablaCasos.setStyleSheet("""
-            QTableWidget {
-                color: darkslategrey;
-                background-color: #F8F9FA;
-                alternate-background-color: #E9ECEF;
-                gridline-color: #DEE2E6;
-                border: 1px solid #CED4DA;
-                font-size: 14px;
-            }
-            QTableWidget::item {
-                padding: 5px;
-            }
-            QTableWidget::item:selected {
-                background-color: #D1E7DD;
-                color: #0F5132;
-            }
-            QHeaderView::section {
-                background-color: #343A40;
-                color: white;
-                padding: 6px;
-                font-weight: bold;
-                border: 1px solid #6C757D;
-            }
-        """)
+                    QTableWidget {
+                        color: darkslategrey;
+                        background-color: #F8F9FA;
+                        alternate-background-color: #E9ECEF;
+                        gridline-color: #DEE2E6;
+                        border: 1px solid #CED4DA;
+                        font-size: 14px;
+                    }
+                    QTableWidget::item {
+                        padding: 5px;
+                    }
+                    QTableWidget::item:selected {
+                        background-color: #D1E7DD;
+                        color: #0F5132;
+                    }
+                    QHeaderView::section {
+                        background-color: #343A40;
+                        color: white;
+                        padding: 6px;
+                        font-weight: bold;
+                        border: 1px solid #6C757D;
+                    }
+                """)
 
         # Configuración extra
         self.tablaCasos.setAlternatingRowColors(True)
-        self.tablaCasos.setColumnWidth(0, 700)
-        self.tablaCasos.setColumnWidth(1, 700)
 
-        self.tablaCasos.setRowHeight(0, 80)
-        self.tablaCasos.setRowHeight(1, 80)
-        self.tablaCasos.setRowHeight(2, 80)
-        self.tablaCasos.setRowHeight(3, 80)
-        self.tablaCasos.setRowHeight(4, 80)
-        self.tablaCasos.setRowHeight(5, 80)
-        self.tablaCasos.setRowHeight(6, 80)
-        self.tablaCasos.setRowHeight(7, 80)
-        self.tablaCasos.setRowHeight(8, 80)
+        for i in range(10):
+            self.tablaCasos.setColumnWidth(i, 136)
 
-        self.tablaCasos.setItem(0, 0, QTableWidgetItem("Nombre"))
-        self.tablaCasos.setItem(1, 0, QTableWidgetItem("Tiempo"))
-        self.tablaCasos.setItem(2, 0, QTableWidgetItem("Fuerza"))
-        self.tablaCasos.setItem(3, 0, QTableWidgetItem("Compresión"))
-        self.tablaCasos.setItem(4, 0, QTableWidgetItem("Pulsos"))
-        self.tablaCasos.setItem(5, 0, QTableWidgetItem("Material"))
-        self.tablaCasos.setItem(6, 0, QTableWidgetItem("Grosor"))
-        self.tablaCasos.setItem(7, 0, QTableWidgetItem("Separación"))
-        self.tablaCasos.setItem(8, 0, QTableWidgetItem("Proximidad"))
+        self.tablaCasos.setHorizontalHeaderLabels(
+            ["Nombre", "Tiempo", "Fuerza", "Compresion", "Pulsos", "Material", "Grosor", "Separacion",
+             "Proximidad", "id"])
+
+        for i in range(len(self.cases)):
+            self.tablaCasos.setRowHeight(i, 80)
+
+            for j in range(10):
+                match j:
+                    case 9:
+                        self.tablaCasos.setItem(i, j, QTableWidgetItem(str(i+1)))
+                    case 0:
+                        self.tablaCasos.setItem(i, j, QTableWidgetItem(self.nombres[i]))
+                    case 1:
+                        self.tablaCasos.setItem(i, j, QTableWidgetItem(str(self.cases[i].get("Tiempo"))))
+                    case 2:
+                        self.tablaCasos.setItem(i, j, QTableWidgetItem(str(self.cases[i].get("Fuerza"))))
+                    case 3:
+                        self.tablaCasos.setItem(i, j, QTableWidgetItem(str(self.cases[i].get("Compresion"))))
+                    case 4:
+                        self.tablaCasos.setItem(i, j, QTableWidgetItem(str(self.cases[i].get("Pulsos"))))
+                    case 5:
+                        self.tablaCasos.setItem(i, j, QTableWidgetItem(str(self.cases[i].get("Material"))))
+                    case 6:
+                        self.tablaCasos.setItem(i, j, QTableWidgetItem(str(self.cases[i].get("Grosor"))))
+                    case 7:
+                        self.tablaCasos.setItem(i, j, QTableWidgetItem(str(self.cases[i].get("Separacion"))))
+                    case 8:
+                        self.tablaCasos.setItem(i, j, QTableWidgetItem(str(self.cases[i].get("Proximidad"))))
 
 
         param_layout.addWidget(self.labelParams1, 0, 0, 1, 2, Qt.AlignmentFlag.AlignTop)
@@ -576,9 +572,8 @@ class HMI(QMainWindow):
         # Pestaña 2
 
         cntrl2_layout.addWidget(self.buttonNuevo, 0, 0)
-        cntrl2_layout.addWidget(self.buttonBuscar, 0, 1)
-        cntrl2_layout.addWidget(self.buttonSave, 0, 2)
-        cntrl2_layout.addWidget(self.buttonBorrar, 0, 3)
+        cntrl2_layout.addWidget(self.buttonSave, 0, 1)
+        cntrl2_layout.addWidget(self.buttonBorrar, 0, 2)
 
         casos_layout.addWidget(self.tablaCasos)
 
@@ -587,8 +582,9 @@ class HMI(QMainWindow):
         self.casosGroup.setLayout(casos_layout)
 
 
-        self.layout_pestana2.addWidget(self.control2Group, 0, 0)
+        self.layout_pestana2.addWidget(self.control2Group, 0, 0, 1, 2)
         self.layout_pestana2.addWidget(self.casosGroup, 1, 0)
+        self.layout_pestana2.addWidget(self.alerts2, 1, 1)
 
         self.pestana2.setLayout(self.layout_pestana2)
 
@@ -662,7 +658,7 @@ class HMI(QMainWindow):
                     index = str(self.cases[n].get("id"))
 
             self.caso = requests.get(f"{self.base_url}/casos/" + index).json()
-            print(self.caso)
+            #print(self.caso)
 
             self.conf1Edit.setText(str(self.caso.get("Tiempo")))
             self.conf2Edit.setText(str(self.caso.get("Fuerza")))
@@ -675,7 +671,7 @@ class HMI(QMainWindow):
 
 
         except Exception as e:
-            self.escribirAlerta("Error. Error al solicitar casos: " + str(e))
+            self.alerts.escribirAlerta("Error. Error al solicitar casos: " + str(e))
 
 
     def crear_prueba(self):
@@ -706,13 +702,13 @@ class HMI(QMainWindow):
 
                     requests.post(f"{self.base_url}/datos", json=self.datos_2).json()
 
-                self.escribirAlerta("Datos registrados correctamente ✓")
+                self.alerts.escribirAlerta("Datos registrados correctamente ✓")
 
             except Exception as e:
-                self.escribirAlerta("Error. Error al registrar datos: " + str(e))
+                self.alerts.escribirAlerta("Error. Error al registrar datos: " + str(e))
 
         else:
-            self.escribirAlerta("Error. PLC no conectado.")
+            self.alerts.escribirAlerta("Error. PLC no conectado.")
 
 
     def connectPLC(self):  # Función para establecer conexión
@@ -725,34 +721,86 @@ class HMI(QMainWindow):
 
             self.connected = True
             self.casesCB.setEnabled(True)
-            self.alerts.setPlainText("Conectado a PLC.")
+            self.alerts.escribirAlerta("Conectado a PLC.")
             self.buttonconnect.setStyleSheet("background-color: green")
 
         except Exception as e:
             self.buttonconnect.setStyleSheet("background-color: red")
-            self.escribirAlerta("Error. Error al conectar: " + str(e))
+            self.alerts.escribirAlerta("Error. Error al conectar: " + str(e))
 
-
-    def escribirAlerta(self, texto):
-        texto_actual = self.alerts.toPlainText()
-        # Insertar nuevo texto antes del existente
-        self.alerts.setPlainText(">" + texto + "\n" + "\n" + texto_actual)
 
     def load_image(self):
         if self.connected:
             self.figure.savefig(self.nombre1)
             self.figure2.savefig(self.nombre2)
-            self.escribirAlerta("Imágenes guardadas. ✓")
+            self.alerts.escribirAlerta("Imágenes guardadas. ✓")
 
         else:
-            self.escribirAlerta("Error. PLC no conectado.")
+            self.alerts.escribirAlerta("Error. PLC no conectado.")
+
 
     def nuevo_caso(self):
+        indice = self.tablaCasos.rowCount()
+        self.tablaCasos.insertRow(indice)
+        self.tablaCasos.setRowHeight(indice, 80)
 
-        for j in range(2):
-            for i in range(9):
+    def guardar_caso(self):
+        if self.confirm:
+            try:
+                datos_tabla = []
+                for fila in range(self.tablaCasos.rowCount()):
+                    fila_datos = {}
+                    for columna in range(self.tablaCasos.columnCount()):
+                        item = self.tablaCasos.item(fila, columna)
+                        # Verificar si el item no está vacío o nulo
+                        if item is not None:
+                            match columna:
+                                case 0:
+                                    encabezado = self.tablaCasos.horizontalHeaderItem(columna).text()
+                                    fila_datos[encabezado] = item.text()
+                                case 1:
+                                    encabezado = self.tablaCasos.horizontalHeaderItem(columna).text()
+                                    fila_datos[encabezado] = float(item.text())
+                                case 2:
+                                    encabezado = self.tablaCasos.horizontalHeaderItem(columna).text()
+                                    fila_datos[encabezado] = float(item.text())
+                                case 3:
+                                    encabezado = self.tablaCasos.horizontalHeaderItem(columna).text()
+                                    fila_datos[encabezado] = float(item.text())
+                                case 4:
+                                    encabezado = self.tablaCasos.horizontalHeaderItem(columna).text()
+                                    fila_datos[encabezado] = int(item.text())
+                                case 5:
+                                    encabezado = self.tablaCasos.horizontalHeaderItem(columna).text()
+                                    fila_datos[encabezado] = item.text()
+                                case 6:
+                                    encabezado = self.tablaCasos.horizontalHeaderItem(columna).text()
+                                    fila_datos[encabezado] = float(item.text())
+                                case 7:
+                                    encabezado = self.tablaCasos.horizontalHeaderItem(columna).text()
+                                    fila_datos[encabezado] = float(item.text())
+                                case 8:
+                                    encabezado = self.tablaCasos.horizontalHeaderItem(columna).text()
+                                    fila_datos[encabezado] = float(item.text())
+                                case 9:
+                                    encabezado = self.tablaCasos.horizontalHeaderItem(columna).text()
+                                    fila_datos[encabezado] = int(item.text())
+                                case 10:
+                                    encabezado = self.tablaCasos.horizontalHeaderItem(columna).text()
+                                    fila_datos[encabezado] = item.text()
+                        else:
+                            fila_datos[self.tablaCasos.horizontalHeaderItem(columna).text()] = ""
+                    datos_tabla.append(fila_datos)
 
-                self.tablaCasos.setItem(i, j, QTableWidgetItem(""))
+                print(datos_tabla)
+                print(self.cases)
+                #for i in range(len(datos_tabla)):
+                #    if datos_tabla[i] == self.cases[i]:
+                self.confirm = False
+
+            except Exception as e:
+                self.alerts2.escribirAlerta("Error. Error al guardar: " + str(e))
+
 
     def updatesamp(self, text):  # Funciones para comportamiento de botones y conexión a PLC
         if text != "":
@@ -760,13 +808,12 @@ class HMI(QMainWindow):
                 num = text
                 self.texto = int(num)
             except Exception:
-                self.escribirAlerta("Error. En este campo solo puede ingresar números enteros.")
+                self.alerts.escribirAlerta("Error. En este campo solo puede ingresar números enteros.")
                 self.samplesEdit.setText("")
 
     def setParams(self):
         if self.connected:
             try:
-
 
                 num = self.texto
                 self.write_int(db_number=12, byte_offset=0, value=num)
@@ -775,9 +822,9 @@ class HMI(QMainWindow):
                 self.escribirAlerta("Parametros configurados ✓")
 
             except Exception as e:
-                self.escribirAlerta("Error. Error al enviar datos: " + str(e))
+                self.alerts.escribirAlerta("Error. Error al enviar datos: " + str(e))
         else:
-            self.escribirAlerta("Error. PLC no conectado.")
+            self.alerts.escribirAlerta("Error. PLC no conectado.")
 
     def actualizar_nombre(self):  # Función para actualizar nombre de gráfica a guardar
         self.index = int(self.index)
@@ -807,43 +854,54 @@ class HMI(QMainWindow):
             try:
                 self.show_plot()
                 #self.write_bool()
-                #self.ser.write()
 
                 #self.temporizador(segundos= 120)
 
                 #signal = self.read_bool()
                 #if signal:
                 #    self.escribirAlerta("Ciclo completo")
+                #    self.show_plot()
 
                 #else:
                 #    self.escribirAlerta("Error. Error en el ciclo de soldadura")
 
             except Exception as e:
-                self.escribirAlerta("Error. Error al iniciar: " + str(e))
+                self.alerts.escribirAlerta("Error. Error al iniciar: " + str(e))
 
         else:
-            self.escribirAlerta("Error. PLC no conectado.")
+            self.alerts.escribirAlerta("Error. PLC no conectado.")
 
 
     def show_plot(self):
 
-        if self.connected:
+        if self.ser.is_open is not None:
             try:
                 self.max = 0
                 self.maxcurr = 0
-                num = self.texto
+                index = 0
 
                 self.figure.clear()
                 self.figure2.clear()
 
                 # Leer datos recibidos
                 if self.ser.in_waiting > 0:
-                    respuesta = self.ser.readline().decode('utf-8').rstrip()
-                    print(f"Recibido: {respuesta}")
+                    data = self.ser.readline().decode('utf-8').rstrip()
+                    #print(f"Recibido: {respuesta}")
 
-                self.time_array = self.read_dword_array(db_number=13, start_byte=0, bytes=num)
+                    linea = json.loads(data)
+
+                    respuesta = [int(i) for i in linea]
+
+                    self.current_array = [(i * 58.59) - 30000 for i in respuesta ]
+
+                    for j in range(len(self.current_array)):
+                        self.time_array.append(index)
+                        index += 0.0002
+
+
+                #self.time_array = self.read_dword_array(db_number=13, start_byte=0, bytes=num)
                 #self.force_array = self.read_real_array(db_number=1, start_byte=0, bytes=num)
-                self.current_array = self.read_real_array(db_number=15, start_byte=0, bytes=num)
+                #self.current_array = self.read_real_array(db_number=15, start_byte=0, bytes=num)
 
                 if len(self.time_array) and len(self.force_array) > 5:
                     for i in range(len(self.force_array)):
@@ -914,10 +972,62 @@ class HMI(QMainWindow):
 
 
             except Exception as e:
-                self.escribirAlerta("Error. Error al solicitar datos: " + str(e))
+                self.alerts.escribirAlerta("Error. Error al solicitar datos: " + str(e))
 
         else:
-            self.escribirAlerta("Error. PLC no conectado.")
+            self.alerts.escribirAlerta("Error. Tarjeta de adquisición de datos no conectada.")
+
+
+    def mostrar_confirmacion(self):
+        # Crear la ventana de confirmación
+        respuesta = QMessageBox.question(
+            self,
+            'Confirmar acción', # Título
+            '¿Estás seguro de que deseas realizar esta acción?', # Mensaje
+            QMessageBox.Yes | QMessageBox.No, # Botones
+            QMessageBox.No # Botón por defecto
+        )
+
+        # Evaluar la respuesta del usuario
+        if respuesta == QMessageBox.Yes:
+            self.confirm = True
+            # self.accept() # Útil si la ventana es un QDialog
+        else:
+            self.confirm = False
+
+
+
+    def closeEvent(self, event):
+
+        event.accept()
+
+        reply = QMessageBox.question(self, 'Salir',
+                                     '¿Estás seguro de que quieres salir?',
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+
+        if reply == QMessageBox.Yes:
+            event.accept()  # Cierra la ventana
+
+            if self.ser is not None or self.plc.connected:
+                self.ser.close()
+                self.plc.disconnect()
+
+        else:
+            event.ignore()  # Cancela el cierre de la ventana
+
+class alertas(QTextEdit):
+    def __init__(self, parent=None):
+        super().__init__()
+        self.setMaximumSize(300, 2000)
+        self.setPlaceholderText("...")
+        self.setFont(QFont("Arial", 12, QFont.Bold))
+        self.setStyleSheet("color: #dddcde; background-color: #5e5e5e; border-radius: 10px; ")
+        self.setReadOnly(True)
+
+    def escribirAlerta(self, texto):
+        texto_actual = self.toPlainText()
+        # Insertar nuevo texto antes del existente
+        self.setPlainText(">" + texto + "\n" + "\n" + texto_actual)
 
 
 if __name__ == "__main__":
