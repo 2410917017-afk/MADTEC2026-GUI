@@ -4,7 +4,7 @@
 
 # pip install matplotlib python-snap7 PyQt5 psycopg2-binary request
 
-import sys, snap7, matplotlib, requests
+import sys, snap7, matplotlib, requests, time, serial
 matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -12,7 +12,7 @@ from snap7.util import get_int, get_real, get_bool, set_int, set_bool, get_dword
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QGridLayout, QPushButton, QLineEdit, QLabel, QGroupBox,
-    QTextEdit, QComboBox, QTabWidget, QMainWindow, QTableWidget, QTableWidgetItem
+    QTextEdit, QComboBox, QTabWidget, QMainWindow, QTableWidget, QTableWidgetItem, QTableWidgetItem
 )
 from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt
@@ -24,7 +24,7 @@ class HMI(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("PLC Plotter")  # Configuración de la ventana de la GUI
-        self.setStyleSheet("background-color: #001b1b")
+        self.setStyleSheet("background-color: #060c06")
 
         # Crear el widget de pestañas principal
         self.tabs = QTabWidget()
@@ -38,18 +38,21 @@ class HMI(QMainWindow):
         self.layout_pestana2 = QGridLayout()
 
         main_layout = QGridLayout()  # Distribución de rejilla, renglones y columnas
-        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setContentsMargins(30, 30, 30, 30)
         param_layout = QGridLayout()
-        param_layout.setContentsMargins(10, 20, 10, 20)
+        param_layout.setContentsMargins(50, 30, 30, 30)
         cntrl_layout = QGridLayout()
         cntrl_layout.setContentsMargins(10, 20, 10, 20)
 
         cntrl2_layout = QGridLayout()
         cntrl2_layout.setContentsMargins(10, 20, 10, 20)
         casos_layout = QGridLayout()
-        casos_layout.setContentsMargins(5, 5, 5, 5)
+        casos_layout.setContentsMargins(200, 35, 200, 35)
 
         self.base_url = "http://192.168.2.199:8000"
+        self.puerto = '/dev/ttyUSB0'
+        self.baudios = 9600
+
         self.datos = {
               "Id" : "",
               "Caso" : "",
@@ -95,57 +98,59 @@ class HMI(QMainWindow):
         self.plc = snap7.client.Client()  # Creación de objeto para comunicación con PLC Siemens S7-1200
 
         self.paramGroup = QGroupBox("Parametros")
-        self.paramGroup.setStyleSheet("background-color: dimgrey; color: whitesmoke; border-radius: 10px")
+        self.paramGroup.setStyleSheet("background-color: #1e1e1e; color: whitesmoke; border-radius: 10px")
         self.paramGroup.setFont(QFont("Arial", 14))
 
         self.controlGroup = QGroupBox("Control")
-        self.controlGroup.setStyleSheet("background-color: #001b1b; color: whitesmoke; border-radius: 10px")
+        self.controlGroup.setStyleSheet("background-color: #1e1e1e; color: whitesmoke; border-radius: 10px")
         self.controlGroup.setFont(QFont("Arial", 14))
 
         self.casosGroup = QGroupBox("Casos")
-        self.casosGroup.setStyleSheet("background-color: #001b1b; color: whitesmoke; border-radius: 10px")
+        self.casosGroup.setStyleSheet("background-color: #1e1e1e; color: whitesmoke; border-radius: 10px")
         self.casosGroup.setFont(QFont("Arial", 14))
 
         self.control2Group = QGroupBox("Control")
-        self.control2Group.setStyleSheet("background-color: #001b1b; color: whitesmoke; border-radius: 10px")
+        self.control2Group.setStyleSheet("background-color: #1e1e1e; color: whitesmoke; border-radius: 10px")
         self.control2Group.setFont(QFont("Arial", 14))
         self.control2Group.setMaximumSize(2000, 450)
 
         self.figure = Figure(figsize=(6, 4), dpi=100)  # Creación de espacio para graficar datos adquiridos del PLC
         self.canvas = FigureCanvas(self.figure)
 
+        self.figure.set_facecolor('#1e1e1e')
+
         self.figure2 = Figure(figsize=(6, 4), dpi=100)
         self.canvas2 = FigureCanvas(self.figure2)
+        self.figure2.set_facecolor('#1e1e1e')
 
         self.buttonstart = QPushButton("Iniciar")  # Creación y configuración de elementos incluidos en la GUI
         self.buttonstart.setFont(QFont("Arial", 20))
         self.buttonstart.setFixedSize(160, 80)
         self.buttonstart.setStyleSheet("""
                                   QPushButton {
-                                  background-color: darkslategrey; 
-                                  color: silver; border: none; 
-                                  border-radius: 34px; 
+                                  background-color: #494be7;
+                                  color: #dddcde; border: none; 
+                                  border-radius: 36px; 
                                   padding: 10px 10px
                                   }
                                   QPushButton:hover {
-                                  background-color: darkgrey;
+                                  background-color: #9193FF;
                                   }
                                   QPushButton:pressed {
                                   padding: 11px 9px 9px 11px;
                                   }
                                   """)
         self.buttonstart.clicked.connect(self.actualizar_nombre)  # Llamada a funciones que ejecutan el comportamiento de botones
-
-        self.buttonstart.clicked.connect(self.showplot)
+        self.buttonstart.clicked.connect(self.iniciar_PLC)
 
         self.buttonconnect = QPushButton("Conectar")
         self.buttonconnect.setFont(QFont("Arial", 20))
         self.buttonconnect.setFixedSize(150, 75)
         self.buttonconnect.setStyleSheet("""
                                   QPushButton {
-                                  background-color: dimgrey; 
-                                  color: silver; border: none; 
-                                  border-radius: 20px; 
+                                  background-color: #5e5e5e; 
+                                  color: #dddcde; border: none; 
+                                  border-radius: 34px; 
                                   padding: 10px 10px
                                   }
                                   QPushButton:hover {
@@ -162,13 +167,13 @@ class HMI(QMainWindow):
         self.buttonset.setFixedSize(160, 75)
         self.buttonset.setStyleSheet("""
                                   QPushButton {
-                                  background-color: darkslategrey; 
-                                  color: silver; border: none; 
-                                  border-radius: 20px; 
+                                  background-color: #494be7; 
+                                  color: #dddcde; border: none; 
+                                  border-radius: 34px; 
                                   padding: 10px 10px
                                   }
                                   QPushButton:hover {
-                                  background-color: darkgrey;
+                                  background-color: #9193FF;
                                   }
                                   QPushButton:pressed {
                                   padding: 11px 9px 9px 11px;
@@ -181,13 +186,13 @@ class HMI(QMainWindow):
         self.buttonload.setFixedSize(200, 75)
         self.buttonload.setStyleSheet("""
                                   QPushButton {
-                                  background-color: darkslategrey; 
-                                  color: silver; border: none; 
-                                  border-radius: 20px; 
+                                  background-color: #494be7; 
+                                  color: #dddcde; border: none; 
+                                  border-radius: 34px; 
                                   padding: 10px 10px
                                   }
                                   QPushButton:hover {
-                                  background-color: darkgrey;
+                                  background-color: #9193FF;
                                   }
                                   QPushButton:pressed {
                                   padding: 11px 9px 9px 11px;
@@ -200,13 +205,13 @@ class HMI(QMainWindow):
         self.buttonimage.setFixedSize(220, 75)
         self.buttonimage.setStyleSheet("""
                                   QPushButton {
-                                  background-color: darkslategrey; 
-                                  color: silver; border: none; 
-                                  border-radius: 20px; 
+                                  background-color: #494be7; 
+                                  color: #dddcde; border: none; 
+                                  border-radius: 34px; 
                                   padding: 10px 10px
                                   }
                                   QPushButton:hover {
-                                  background-color: darkgrey;
+                                  background-color: #9193FF;
                                   }
                                   QPushButton:pressed {
                                   padding: 11px 9px 9px 11px;
@@ -216,8 +221,8 @@ class HMI(QMainWindow):
 
 
         self.labelParams1 = QLabel("Parametros ideales")
-        self.labelParams1.setFont(QFont("Arial", 16))
-        self.labelParams1.setStyleSheet("color: whitesmoke")
+        self.labelParams1.setFont(QFont("Arial", 20))
+        self.labelParams1.setStyleSheet("color: #dddcde")
         fuente = self.labelParams1.font()
         fuente.setUnderline(True)
         self.labelParams1.setFont(fuente)
@@ -225,89 +230,89 @@ class HMI(QMainWindow):
 
         self.label1 = QLabel("Tiempo:")
         self.label1.setFont(QFont("Arial", 14))
-        self.label1.setStyleSheet("color: whitesmoke")
+        self.label1.setStyleSheet("color: #dddcde")
 
         self.mat1Edit = QLabel("200ms-300ms")
         self.mat1Edit.setFont(QFont("Arial", 14))
         self.mat1Edit.setFixedSize(150, 60)
-        self.mat1Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.mat1Edit.setStyleSheet("color: black; background-color: #dddcde; border-radius: 2px")
         self.mat1Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.label2 = QLabel("Fuerza:")
         self.label2.setFont(QFont("Arial", 14))
-        self.label2.setStyleSheet("color: whitesmoke")
+        self.label2.setStyleSheet("color: #dddcde")
 
         self.mat2Edit = QLabel("2.0 kN–4.5 kN")
         self.mat2Edit.setFont(QFont("Arial", 14))
         self.mat2Edit.setFixedSize(150, 60)
-        self.mat2Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.mat2Edit.setStyleSheet("color: black; background-color: #dddcde; border-radius: 2px")
         self.mat2Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.label3 = QLabel("Tiempo de compresión:")
         self.label3.setFont(QFont("Arial", 14))
-        self.label3.setStyleSheet("color: whitesmoke")
+        self.label3.setStyleSheet("color: #dddcde")
 
         self.mat3Edit = QLabel("150 ms–300 ms")
         self.mat3Edit.setFont(QFont("Arial", 14))
         self.mat3Edit.setFixedSize(150, 60)
-        self.mat3Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.mat3Edit.setStyleSheet("color: black; background-color: #dddcde; border-radius: 2px")
         self.mat3Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.label4 = QLabel("Pulsos:")
         self.label4.setFont(QFont("Arial", 14))
-        self.label4.setStyleSheet("color: whitesmoke")
+        self.label4.setStyleSheet("color: #dddcde")
 
         self.mat4Edit = QLabel("1")
         self.mat4Edit.setFont(QFont("Arial", 14))
         self.mat4Edit.setFixedSize(150, 60)
-        self.mat4Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.mat4Edit.setStyleSheet("color: black; background-color: #dddcde; border-radius: 2px")
         self.mat4Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.label5 = QLabel("Material:")
         self.label5.setFont(QFont("Arial", 14))
-        self.label5.setStyleSheet("color: whitesmoke")
+        self.label5.setStyleSheet("color: #dddcde")
 
         self.mat5Edit = QLabel("Acero")
         self.mat5Edit.setFont(QFont("Arial", 14))
         self.mat5Edit.setFixedSize(150, 60)
-        self.mat5Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.mat5Edit.setStyleSheet("color: black; background-color: #dddcde; border-radius: 2px")
         self.mat5Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.label6 = QLabel("Grosor:")
         self.label6.setFont(QFont("Arial", 14))
-        self.label6.setStyleSheet("color: whitesmoke")
+        self.label6.setStyleSheet("color: #dddcde")
 
         self.mat6Edit = QLabel("0.4mm-0.8mm")
         self.mat6Edit.setFont(QFont("Arial", 14))
         self.mat6Edit.setFixedSize(150, 60)
-        self.mat6Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.mat6Edit.setStyleSheet("color: black; background-color: #dddcde; border-radius: 2px")
         self.mat6Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.label7 = QLabel("Separación:")
         self.label7.setFont(QFont("Arial", 14))
-        self.label7.setStyleSheet("color: whitesmoke")
+        self.label7.setStyleSheet("color: #dddcde")
 
         self.mat7Edit = QLabel("0")
         self.mat7Edit.setFont(QFont("Arial", 14))
         self.mat7Edit.setFixedSize(150, 60)
-        self.mat7Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.mat7Edit.setStyleSheet("color: black; background-color: #dddcde; border-radius: 2px")
         self.mat7Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.label8 = QLabel("Proximidad:")
         self.label8.setFont(QFont("Arial", 14))
-        self.label8.setStyleSheet("color: whitesmoke")
+        self.label8.setStyleSheet("color: #dddcde")
 
         self.mat8Edit = QLabel("> 6mm")
         self.mat8Edit.setFont(QFont("Arial", 14))
         self.mat8Edit.setFixedSize(150, 60)
-        self.mat8Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.mat8Edit.setStyleSheet("color: black; background-color: #dddcde; border-radius: 2px")
         self.mat8Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
 
 
         self.labelParams2 = QLabel("Parametros Configurados")
-        self.labelParams2.setFont(QFont("Arial", 16))
-        self.labelParams2.setStyleSheet("color: whitesmoke")
+        self.labelParams2.setFont(QFont("Arial", 20))
+        self.labelParams2.setStyleSheet("color: #dddcde")
         fuente = self.labelParams2.font()
         fuente.setUnderline(True)
         self.labelParams2.setFont(fuente)
@@ -317,49 +322,49 @@ class HMI(QMainWindow):
         self.conf1Edit = QLabel("...")
         self.conf1Edit.setFont(QFont("Arial", 14))
         self.conf1Edit.setFixedSize(150, 60)
-        self.conf1Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.conf1Edit.setStyleSheet("color: black; background-color: #dddcde; border-radius: 2px")
         self.conf1Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.conf2Edit = QLabel("...")
         self.conf2Edit.setFont(QFont("Arial", 14))
         self.conf2Edit.setFixedSize(150, 60)
-        self.conf2Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.conf2Edit.setStyleSheet("color: black; background-color: #dddcde; border-radius: 2px")
         self.conf2Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.conf3Edit = QLabel("...")
         self.conf3Edit.setFont(QFont("Arial", 14))
         self.conf3Edit.setFixedSize(150, 60)
-        self.conf3Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.conf3Edit.setStyleSheet("color: black; background-color: #dddcde; border-radius: 2px")
         self.conf3Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.conf4Edit = QLabel("...")
         self.conf4Edit.setFont(QFont("Arial", 14))
         self.conf4Edit.setFixedSize(150, 60)
-        self.conf4Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.conf4Edit.setStyleSheet("color: black; background-color: #dddcde; border-radius: 2px")
         self.conf4Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.conf5Edit = QLabel("...")
         self.conf5Edit.setFont(QFont("Arial", 14))
         self.conf5Edit.setFixedSize(150, 60)
-        self.conf5Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.conf5Edit.setStyleSheet("color: black; background-color: #dddcde; border-radius: 2px")
         self.conf5Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.conf6Edit = QLabel("...")
         self.conf6Edit.setFont(QFont("Arial", 14))
         self.conf6Edit.setFixedSize(150, 60)
-        self.conf6Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.conf6Edit.setStyleSheet("color: black; background-color: #dddcde; border-radius: 2px")
         self.conf6Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.conf7Edit = QLabel("...")
         self.conf7Edit.setFont(QFont("Arial", 14))
         self.conf7Edit.setFixedSize(150, 60)
-        self.conf7Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.conf7Edit.setStyleSheet("color: black; background-color: #dddcde; border-radius: 2px")
         self.conf7Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.conf8Edit = QLabel("...")
         self.conf8Edit.setFont(QFont("Arial", 14))
         self.conf8Edit.setFixedSize(150, 60)
-        self.conf8Edit.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.conf8Edit.setStyleSheet("color: black; background-color: #dddcde; border-radius: 2px")
         self.conf8Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.cases = requests.get(f"{self.base_url}/casos").json()
@@ -370,9 +375,9 @@ class HMI(QMainWindow):
         self.casesCB = QComboBox()
         self.casesCB.addItems(nombres)
         self.casesCB.setFont(QFont("Arial", 18))
-        self.casesCB.setStyleSheet("color: black; background-color: silver")
+        self.casesCB.setStyleSheet("color: #dddcde; background-color: #5e5e5e")
         self.casesCB.currentTextChanged.connect(self.case_changed)
-        self.casesCB.setFixedSize(160, 75)
+        self.casesCB.setFixedSize(220, 75)
         self.casesCB.setEnabled(True)
 
 
@@ -380,14 +385,14 @@ class HMI(QMainWindow):
         self.samplesEdit.setPlaceholderText("N. de muestras...")
         self.samplesEdit.setFont(QFont("Arial", 18))
         self.samplesEdit.setFixedSize(160, 75)
-        self.samplesEdit.setStyleSheet("color: black; background-color: silver")
+        self.samplesEdit.setStyleSheet("color: #dddcde; background-color: #5e5e5e")
         self.samplesEdit.textChanged.connect(self.updatesamp)
 
         self.alerts = QTextEdit()
         self.alerts.setMaximumSize(300, 2000)
         self.alerts.setPlaceholderText("...")
         self.alerts.setFont(QFont("Arial", 12, QFont.Bold))
-        self.alerts.setStyleSheet("color: black; background-color: silver")
+        self.alerts.setStyleSheet("color: #dddcde; background-color: #5e5e5e; border-radius: 10px; ")
         self.alerts.setReadOnly(True)
 
         # Pestaña 2
@@ -396,32 +401,32 @@ class HMI(QMainWindow):
         self.buttonNuevo.setFixedSize(220, 75)
         self.buttonNuevo.setStyleSheet("""
                                           QPushButton {
-                                          background-color: darkslategrey; 
-                                          color: silver; border: none; 
-                                          border-radius: 20px; 
+                                          background-color: #494be7; 
+                                          color: #dddcde; border: none; 
+                                          border-radius: 34px; 
                                           padding: 10px 10px
                                           }
                                           QPushButton:hover {
-                                          background-color: darkgrey;
+                                          background-color: #9193FF;
                                           }
                                           QPushButton:pressed {
                                           padding: 11px 9px 9px 11px;
                                           }
                                           """)
-        #self.buttonNuevo.clicked.connect(self.nuevo_caso)
+        self.buttonNuevo.clicked.connect(self.nuevo_caso)
 
         self.buttonBuscar = QPushButton("Buscar")
         self.buttonBuscar.setFont(QFont("Arial", 20))
         self.buttonBuscar.setFixedSize(220, 75)
         self.buttonBuscar.setStyleSheet("""
                                           QPushButton {
-                                          background-color: darkslategrey; 
-                                          color: silver; border: none; 
-                                          border-radius: 20px; 
+                                          background-color: #494be7; 
+                                          color: #dddcde; border: none; 
+                                          border-radius: 34px; 
                                           padding: 10px 10px
                                           }
                                           QPushButton:hover {
-                                          background-color: darkgrey;
+                                          background-color: #9193FF;
                                           }
                                           QPushButton:pressed {
                                           padding: 11px 9px 9px 11px;
@@ -434,13 +439,13 @@ class HMI(QMainWindow):
         self.buttonSave.setFixedSize(220, 75)
         self.buttonSave.setStyleSheet("""
                                           QPushButton {
-                                          background-color: darkslategrey; 
-                                          color: silver; border: none; 
-                                          border-radius: 20px; 
+                                          background-color: #494be7; 
+                                          color: #dddcde; border: none; 
+                                          border-radius: 34px; 
                                           padding: 10px 10px
                                           }
                                           QPushButton:hover {
-                                          background-color: darkgrey;
+                                          background-color: #9193FF;
                                           }
                                           QPushButton:pressed {
                                           padding: 11px 9px 9px 11px;
@@ -453,13 +458,14 @@ class HMI(QMainWindow):
         self.buttonBorrar.setFixedSize(220, 75)
         self.buttonBorrar.setStyleSheet("""
                                           QPushButton {
-                                          background-color: darkslategrey; 
+                                          background-color: #494be7; 
                                           color: silver; border: none; 
-                                          border-radius: 20px; 
+                                          color: #dddcde; border: none; 
+                                          border-radius: 34px; 
                                           padding: 10px 10px
                                           }
                                           QPushButton:hover {
-                                          background-color: darkgrey;
+                                          background-color: #9193FF;
                                           }
                                           QPushButton:pressed {
                                           padding: 11px 9px 9px 11px;
@@ -469,13 +475,36 @@ class HMI(QMainWindow):
 
 
         self.tablaCasos = QTableWidget(9, 2)
-        self.tablaCasos.setFont(QFont("Arial", 14))
-        self.tablaCasos.resize(1400, 640)
-        self.tablaCasos.setStyleSheet("color: black; background-color: silver; border-radius: 2px")
+        self.tablaCasos.setStyleSheet("""
+            QTableWidget {
+                color: darkslategrey;
+                background-color: #F8F9FA;
+                alternate-background-color: #E9ECEF;
+                gridline-color: #DEE2E6;
+                border: 1px solid #CED4DA;
+                font-size: 14px;
+            }
+            QTableWidget::item {
+                padding: 5px;
+            }
+            QTableWidget::item:selected {
+                background-color: #D1E7DD;
+                color: #0F5132;
+            }
+            QHeaderView::section {
+                background-color: #343A40;
+                color: white;
+                padding: 6px;
+                font-weight: bold;
+                border: 1px solid #6C757D;
+            }
+        """)
+
+        # Configuración extra
+        self.tablaCasos.setAlternatingRowColors(True)
         self.tablaCasos.setColumnWidth(0, 700)
         self.tablaCasos.setColumnWidth(1, 700)
 
-        # Establecer la altura de la primera fila (índice 0) a 50 píxeles
         self.tablaCasos.setRowHeight(0, 80)
         self.tablaCasos.setRowHeight(1, 80)
         self.tablaCasos.setRowHeight(2, 80)
@@ -551,12 +580,15 @@ class HMI(QMainWindow):
         cntrl2_layout.addWidget(self.buttonSave, 0, 2)
         cntrl2_layout.addWidget(self.buttonBorrar, 0, 3)
 
+        casos_layout.addWidget(self.tablaCasos)
+
 
         self.control2Group.setLayout(cntrl2_layout)
+        self.casosGroup.setLayout(casos_layout)
 
 
         self.layout_pestana2.addWidget(self.control2Group, 0, 0)
-        self.layout_pestana2.addWidget(self.tablaCasos, 1, 0)
+        self.layout_pestana2.addWidget(self.casosGroup, 1, 0)
 
         self.pestana2.setLayout(self.layout_pestana2)
 
@@ -629,17 +661,17 @@ class HMI(QMainWindow):
 
                     index = str(self.cases[n].get("id"))
 
-            caso = requests.get(f"{self.base_url}/casos/" + index).json()
-            print(caso)
+            self.caso = requests.get(f"{self.base_url}/casos/" + index).json()
+            print(self.caso)
 
-            self.conf1Edit.setText(str(caso.get("Tiempo")))
-            self.conf2Edit.setText(str(caso.get("Fuerza")))
-            self.conf3Edit.setText(str(caso.get("Compresion")))
-            self.conf4Edit.setText(str(caso.get("Pulsos")))
-            self.conf5Edit.setText(str(caso.get("Material")))
-            self.conf6Edit.setText(str(caso.get("Grosor")))
-            self.conf7Edit.setText(str(caso.get("Separacion")))
-            self.conf8Edit.setText(str(caso.get("Proximidad")))
+            self.conf1Edit.setText(str(self.caso.get("Tiempo")))
+            self.conf2Edit.setText(str(self.caso.get("Fuerza")))
+            self.conf3Edit.setText(str(self.caso.get("Compresion")))
+            self.conf4Edit.setText(str(self.caso.get("Pulsos")))
+            self.conf5Edit.setText(str(self.caso.get("Material")))
+            self.conf6Edit.setText(str(self.caso.get("Grosor")))
+            self.conf7Edit.setText(str(self.caso.get("Separacion")))
+            self.conf8Edit.setText(str(self.caso.get("Proximidad")))
 
 
         except Exception as e:
@@ -685,6 +717,8 @@ class HMI(QMainWindow):
 
     def connectPLC(self):  # Función para establecer conexión
         try:
+            self.ser = serial.Serial(self.puerto, self.baudios, timeout=1)
+            time.sleep(2)
 
             self.plc.disconnect()
             self.plc.connect("192.168.0.1", rack=0, slot=1)
@@ -713,6 +747,12 @@ class HMI(QMainWindow):
         else:
             self.escribirAlerta("Error. PLC no conectado.")
 
+    def nuevo_caso(self):
+
+        for j in range(2):
+            for i in range(9):
+
+                self.tablaCasos.setItem(i, j, QTableWidgetItem(""))
 
     def updatesamp(self, text):  # Funciones para comportamiento de botones y conexión a PLC
         if text != "":
@@ -727,8 +767,10 @@ class HMI(QMainWindow):
         if self.connected:
             try:
 
+
                 num = self.texto
                 self.write_int(db_number=12, byte_offset=0, value=num)
+
                 #self.write_real() # Enviar tiempo de soldadura
                 self.escribirAlerta("Parametros configurados ✓")
 
@@ -751,8 +793,39 @@ class HMI(QMainWindow):
         self.nombre1 = "Plots/grafica_" + "F" + "_" + self.identif
         self.nombre2 = "Plots/grafica_" + "I" + "_" + self.identif
 
+    def temporizador(self, segundos):
+        while segundos > 0:
+            signal = self.read_bool()
+            if signal:
+                self.show_plot()
+                break
+            time.sleep(1)
+            segundos -= 1
 
-    def showplot(self):
+    def iniciar_PLC(self):
+        if self.connected:
+            try:
+                self.show_plot()
+                #self.write_bool()
+                #self.ser.write()
+
+                #self.temporizador(segundos= 120)
+
+                #signal = self.read_bool()
+                #if signal:
+                #    self.escribirAlerta("Ciclo completo")
+
+                #else:
+                #    self.escribirAlerta("Error. Error en el ciclo de soldadura")
+
+            except Exception as e:
+                self.escribirAlerta("Error. Error al iniciar: " + str(e))
+
+        else:
+            self.escribirAlerta("Error. PLC no conectado.")
+
+
+    def show_plot(self):
 
         if self.connected:
             try:
@@ -763,8 +836,13 @@ class HMI(QMainWindow):
                 self.figure.clear()
                 self.figure2.clear()
 
+                # Leer datos recibidos
+                if self.ser.in_waiting > 0:
+                    respuesta = self.ser.readline().decode('utf-8').rstrip()
+                    print(f"Recibido: {respuesta}")
+
                 self.time_array = self.read_dword_array(db_number=13, start_byte=0, bytes=num)
-                self.force_array = self.read_real_array(db_number=1, start_byte=0, bytes=num)
+                #self.force_array = self.read_real_array(db_number=1, start_byte=0, bytes=num)
                 self.current_array = self.read_real_array(db_number=15, start_byte=0, bytes=num)
 
                 if len(self.time_array) and len(self.force_array) > 5:
@@ -782,34 +860,49 @@ class HMI(QMainWindow):
 
                 ax = self.figure.add_subplot(111)
                 ax.clear()
-                ax.plot(self.time_array, self.force_array, marker="o", color="blue")
+                ax.plot(self.time_array, self.force_array, marker="o", color="#51F564")
                 ax.set_title(
                     f"Fuerza vs tiempo\n"
                     f"Tiempo de soldadura: {self.tSoldadura} ms | "
                     f"N. de muestras: {self.texto} | "
                     f"F máxima: {self.max} N \n"
                     f"Fecha: {self.fecha_formateada}"
-                    , fontweight='bold', fontsize=8
+                    , fontweight='bold', fontsize=8, color = '#dddcde'
                 )
-                ax.set_xlabel("Tiempo")
-                ax.set_ylabel("Fuerza")
+
+                ax.set_xlabel("Tiempo", color = '#dddcde')
+                ax.set_ylabel("Fuerza", color = '#dddcde')
                 ax.legend()
+                ax.set_facecolor("#1e1e1e")
+                ax.spines['bottom'].set_color('#dddcde')
+                ax.spines['left'].set_color('#dddcde')
+
+                # Cambiar color de los números, marcas y etiquetas
+                ax.tick_params(axis='x', colors='#dddcde')
+                ax.tick_params(axis='y', colors='#dddcde')
                 self.canvas.draw()  # Refresca el lienzo
 
                 ax2 = self.figure2.add_subplot(111)
                 ax2.clear()
-                ax2.plot(self.time_array, self.current_array, marker="o", color="blue")
+                ax2.plot(self.time_array, self.current_array, marker="o", color="#FA4141")
                 ax2.set_title(
                     f"Corriente vs tiempo\n"
                     f"Tiempo de soldadura: {self.tSoldadura} ms | "
                     f"N. de muestras: {self.texto} | "
                     f"I máxima: {self.maxcurr} A \n"
                     f"Fecha: {self.fecha_formateada}"
-                    , fontweight='bold', fontsize=8
+                    , fontweight='bold', fontsize=8, color = '#dddcde'
                 )
-                ax2.set_xlabel("Tiempo")
-                ax2.set_ylabel("Corriente")
+                ax2.set_xlabel("Tiempo", color = '#dddcde')
+                ax2.set_ylabel("Corriente", color = '#dddcde')
                 ax2.legend()
+                ax2.set_facecolor("#1e1e1e")
+                ax2.spines['bottom'].set_color('#dddcde')
+                ax2.spines['left'].set_color('#dddcde')
+
+                # Cambiar color de los números, marcas y etiquetas
+                ax2.tick_params(axis='x', colors='#dddcde')
+                ax2.tick_params(axis='y', colors='#dddcde')
                 self.canvas2.draw()  # Refresca el lienzo
 
                 self.escribirAlerta("Datos obtenidos correctamente ✓")
