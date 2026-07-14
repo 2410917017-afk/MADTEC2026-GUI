@@ -70,7 +70,7 @@ def actualizar_caso(
 def eliminar_caso(id_caso: int, db: Session = Depends(get_db)):
 
     caso = db.query(CasoSoldadura).filter(
-        CasoSoldadura.id_caso == id_caso
+        CasoSoldadura.id == id_caso
     ).first()
 
     if caso is None:

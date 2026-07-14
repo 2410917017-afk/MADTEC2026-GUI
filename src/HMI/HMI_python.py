@@ -46,7 +46,7 @@ class HMI(QMainWindow):
         cntrl2_layout = QGridLayout()
         cntrl2_layout.setContentsMargins(10, 20, 10, 20)
         casos_layout = QGridLayout()
-        casos_layout.setContentsMargins(200, 35, 200, 35)
+        casos_layout.setContentsMargins(60, 35, 60, 35)
 
         self.base_url = "http://192.168.2.199:8000"
         self.puerto = '/dev/ttyUSB0'
@@ -81,6 +81,7 @@ class HMI(QMainWindow):
         self.cases = {"" : ""}
 
         self.confirm = False
+        self.casoEliminar = None
 
         self.connected = False  # Declaración de variables utilizadas
         self.texto = 0
@@ -99,6 +100,8 @@ class HMI(QMainWindow):
         self.fecha_formateada = ahora.strftime("%d-%m-%Y-%H-%M-%S")
 
         self.plc = snap7.client.Client()
+
+        self.casoElimimar = ""
 
         self.alerts = alertas()
         self.alerts2 = alertas()
@@ -457,7 +460,28 @@ class HMI(QMainWindow):
                                           padding: 11px 9px 9px 11px;
                                           }
                                           """)
-        #self.buttonBorrar.clicked.connect(self.borrar_caso)
+        self.buttonBorrar.clicked.connect(self.mostrar_confirmacion)
+        self.buttonBorrar.clicked.connect(self.borrar_caso)
+
+        self.buttonRefresh = QPushButton("Actualizar")
+        self.buttonRefresh.setFont(QFont("Arial", 20))
+        self.buttonRefresh.setFixedSize(220, 75)
+        self.buttonRefresh.setStyleSheet("""
+                                                  QPushButton {
+                                                  background-color: #494be7; 
+                                                  color: silver; border: none; 
+                                                  color: #dddcde; border: none; 
+                                                  border-radius: 34px; 
+                                                  padding: 10px 10px
+                                                  }
+                                                  QPushButton:hover {
+                                                  background-color: #9193FF;
+                                                  }
+                                                  QPushButton:pressed {
+                                                  padding: 11px 9px 9px 11px;
+                                                  }
+                                                  """)
+        self.buttonRefresh.clicked.connect(self.Refresh_tabla)
 
         self.tablaCasos = QTableWidget(len(self.cases), 10)
         self.tablaCasos.setStyleSheet("""
@@ -484,6 +508,7 @@ class HMI(QMainWindow):
                         border: 1px solid #6C757D;
                     }
                 """)
+        self.tablaCasos.cellClicked.connect(self.on_cell_clicked)
 
         # Configuración extra
         self.tablaCasos.setAlternatingRowColors(True)
@@ -501,7 +526,7 @@ class HMI(QMainWindow):
             for j in range(10):
                 match j:
                     case 9:
-                        self.tablaCasos.setItem(i, j, QTableWidgetItem(str(i+1)))
+                        self.tablaCasos.setItem(i, j, QTableWidgetItem(str(self.cases[i].get("id"))))
                     case 0:
                         self.tablaCasos.setItem(i, j, QTableWidgetItem(self.nombres[i]))
                     case 1:
@@ -574,6 +599,7 @@ class HMI(QMainWindow):
         cntrl2_layout.addWidget(self.buttonNuevo, 0, 0)
         cntrl2_layout.addWidget(self.buttonSave, 0, 1)
         cntrl2_layout.addWidget(self.buttonBorrar, 0, 2)
+        cntrl2_layout.addWidget(self.buttonRefresh, 0, 3)
 
         casos_layout.addWidget(self.tablaCasos)
 
@@ -672,6 +698,72 @@ class HMI(QMainWindow):
 
         except Exception as e:
             self.alerts.escribirAlerta("Error. Error al solicitar casos: " + str(e))
+
+    def Refresh_tabla(self):
+        for i in range(len(self.cases)):
+
+            for j in range(10):
+                self.tablaCasos.setItem(i, j, QTableWidgetItem(""))
+
+        self.cases = requests.get(f"{self.base_url}/casos").json()
+        time.sleep(2)
+
+
+        for i in range(len(self.cases)):
+
+            for j in range(10):
+                match j:
+                    case 9:
+                        self.tablaCasos.setItem(i, j, QTableWidgetItem(str(self.cases[i].get("id"))))
+                    case 0:
+                        self.tablaCasos.setItem(i, j, QTableWidgetItem(str(self.cases[i].get("Nombre"))))
+                    case 1:
+                        self.tablaCasos.setItem(i, j, QTableWidgetItem(str(self.cases[i].get("Tiempo"))))
+                    case 2:
+                        self.tablaCasos.setItem(i, j, QTableWidgetItem(str(self.cases[i].get("Fuerza"))))
+                    case 3:
+                        self.tablaCasos.setItem(i, j, QTableWidgetItem(str(self.cases[i].get("Compresion"))))
+                    case 4:
+                        self.tablaCasos.setItem(i, j, QTableWidgetItem(str(self.cases[i].get("Pulsos"))))
+                    case 5:
+                        self.tablaCasos.setItem(i, j, QTableWidgetItem(str(self.cases[i].get("Material"))))
+                    case 6:
+                        self.tablaCasos.setItem(i, j, QTableWidgetItem(str(self.cases[i].get("Grosor"))))
+                    case 7:
+                        self.tablaCasos.setItem(i, j, QTableWidgetItem(str(self.cases[i].get("Separacion"))))
+                    case 8:
+                        self.tablaCasos.setItem(i, j, QTableWidgetItem(str(self.cases[i].get("Proximidad"))))
+
+        for row in range(self.tablaCasos.rowCount()):
+            item = self.tablaCasos.item(row, 0)
+            if  item == None or item.text() == "":
+                self.tablaCasos.removeRow(row)
+
+        self.nombres.clear()
+        self.indices.clear()
+
+        for m in range(len(self.cases)):
+            self.nombres.append(self.cases[m].get("Nombre"))
+
+
+        self.casesCB.clear()
+        self.casesCB.addItems(self.nombres)
+
+        self.alerts2.escribirAlerta("Tabla actualizada con exito.")
+
+    def on_cell_clicked(self, row, column):
+
+        item = self.tablaCasos.item(row, 9)
+        if item is not None:
+            self.casoEliminar = item.text()
+
+
+    def borrar_caso(self):
+        if self.confirm:
+
+            requests.delete(f"{self.base_url}/casos/" + self.casoEliminar)
+
+            self.alerts2.escribirAlerta("Caso eliminado correctamente.")
 
 
     def crear_prueba(self):
@@ -792,11 +884,24 @@ class HMI(QMainWindow):
                             fila_datos[self.tablaCasos.horizontalHeaderItem(columna).text()] = ""
                     datos_tabla.append(fila_datos)
 
-                print(datos_tabla)
-                print(self.cases)
-                #for i in range(len(datos_tabla)):
-                #    if datos_tabla[i] == self.cases[i]:
+
+                if len(datos_tabla) == len(self.cases):
+                    for i in range(len(datos_tabla)):
+                        if datos_tabla[i] == self.cases[i]:
+                            pass
+                        else:
+                            iden = datos_tabla[i].get("id")
+                            requests.put(f"{self.base_url}/casos/" + str(iden), json=datos_tabla[i]).json()
+
+                elif len(datos_tabla) > len(self.cases):
+                    index = len(datos_tabla) - len(self.cases)
+                    total = self.tablaCasos.rowCount() - index
+
+                    for i in range(index):
+                        requests.post(f"{self.base_url}/casos", json=datos_tabla[i + total ]).json()
+
                 self.confirm = False
+                self.alerts2.escribirAlerta("Casos actualizados en la base de datos.")
 
             except Exception as e:
                 self.alerts2.escribirAlerta("Error. Error al guardar: " + str(e))
