@@ -12,6 +12,7 @@ import matplotlib
 import serial
 import snap7
 
+import cv2
 matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -19,8 +20,8 @@ from PyQt5.QtWidgets import (
     QApplication, QWidget, QGridLayout, QPushButton, QLineEdit, QLabel, QGroupBox,
     QComboBox, QTabWidget, QMainWindow, QTableWidget, QMessageBox, QTableWidgetItem
 )
-from PyQt5.QtGui import QFont
-from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont, QImage, QPixmap
+from PyQt5.QtCore import Qt, QTimer
 from datetime import datetime
 
 from hmi.config import BASE_URL, PLC_HOST, PLC_RACK, PLC_SLOT, PLOTS_DIR, SERIAL_BAUDRATE, SERIAL_PORT
@@ -73,6 +74,16 @@ class HMI(QMainWindow):
         self.baudios = SERIAL_BAUDRATE
         self.busqueda = None
         self.ser = None
+        self.detector = cv2.QRCodeDetector()
+        self.cap = cv2.VideoCapture(0)
+        self.last_data = ""
+
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.update_frame)
+        self.timer.start(30)
+
+        self.labelImagen = QLabel(self)
+        self.labelImagen.resize(800, 600)
 
         self.datos = {
               "Id" : "",
@@ -609,7 +620,7 @@ class HMI(QMainWindow):
 
         main_layout.addWidget(self.paramGroup, 1, 0, 2, 1)
         main_layout.addWidget(self.controlGroup, 0, 0, 1, 3)
-        main_layout.addWidget(self.canvas, 1, 1, 1, 1)
+        main_layout.addWidget(self.labelImagen, 1, 1, 1, 1)
         main_layout.addWidget(self.canvas2, 2, 1, 1, 1)
         main_layout.addWidget(self.alerts, 1, 2, 2, 1)
 
@@ -668,6 +679,56 @@ class HMI(QMainWindow):
     def write_bool(self, db, byte_offset, bit, value: bool):
         plc_write_bool(self.plc, db, byte_offset, bit, value)
 
+    def update_frame(self):
+
+        ret, frame = self.cap.read()
+
+        if not ret:
+            return
+
+        data, bbox, _ = self.detector.detectAndDecode(frame)
+
+        if bbox is not None:
+
+            pts = bbox.astype(int)
+
+            for i in range(len(pts)):
+                p1 = tuple(pts[i][0])
+                p2 = tuple(pts[(i + 1) % len(pts)][0])
+                cv2.line(frame, p1, p2, (0, 255, 0), 2)
+
+        if data and data != self.last_data:
+
+            self.last_data = data
+
+            self.alerts.escribirAlerta("Qr encontrado: " + str(data))
+            self.buscarid(data)
+
+
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+        h, w, ch = rgb.shape
+
+        image = QImage(rgb.data, w, h, ch * w, QImage.Format_RGB888)
+
+        self.labelImagen.setPixmap(QPixmap.fromImage(image))
+
+    def buscarid(self, text):
+        ident = int(text)
+        self.caso = self.api.get_case(ident)
+        self.alerts.escribirAlerta("Caso seleccionado: " + str(self.caso.get("Nombre")))
+
+        self.conf1Edit.setText(str(self.caso.get("Tiempo")))
+        self.conf2Edit.setText(str(self.caso.get("Fuerza")))
+        self.conf3Edit.setText(str(self.caso.get("Compresion")))
+        self.conf4Edit.setText(str(self.caso.get("Pulsos")))
+        self.conf5Edit.setText(str(self.caso.get("Material")))
+        self.conf6Edit.setText(str(self.caso.get("Grosor")))
+        self.conf7Edit.setText(str(self.caso.get("Separacion")))
+        self.conf8Edit.setText(str(self.caso.get("Proximidad")))
+
+
+
     def case_changed(self, texto):
         try:
             index = ""
@@ -681,7 +742,7 @@ class HMI(QMainWindow):
                 return
 
             self.caso = self.api.get_case(index)
-            #print(self.caso)
+            self.alerts.escribirAlerta("Caso seleccionado: " + str(self.caso.get("Nombre")))
 
             self.conf1Edit.setText(str(self.caso.get("Tiempo")))
             self.conf2Edit.setText(str(self.caso.get("Fuerza")))
@@ -1097,12 +1158,16 @@ class HMI(QMainWindow):
                                      QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
 
         if reply == QMessageBox.Yes:
-            event.accept()  # Cierra la ventana
+            self.timer.stop()
+
+            self.cap.release()
 
             if self.ser is not None and self.ser.is_open:
                 self.ser.close()
             if self.plc.connected:
                 self.plc.disconnect()
+
+            event.accept()  # Cierra la ventana
 
         else:
             event.ignore()  # Cancela el cierre de la ventana
