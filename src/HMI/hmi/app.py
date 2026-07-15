@@ -847,39 +847,31 @@ class HMI(QMainWindow):
                         item = self.tablaCasos.item(fila, columna)
                         # Verificar si el item no está vacío o nulo
                         if item is not None:
+                            encabezado = self.tablaCasos.horizontalHeaderItem(columna).text()
+
+
                             match columna:
                                 case 0:
-                                    encabezado = self.tablaCasos.horizontalHeaderItem(columna).text()
                                     fila_datos[encabezado] = item.text()
                                 case 1:
-                                    encabezado = self.tablaCasos.horizontalHeaderItem(columna).text()
                                     fila_datos[encabezado] = float(item.text())
                                 case 2:
-                                    encabezado = self.tablaCasos.horizontalHeaderItem(columna).text()
                                     fila_datos[encabezado] = float(item.text())
                                 case 3:
-                                    encabezado = self.tablaCasos.horizontalHeaderItem(columna).text()
                                     fila_datos[encabezado] = float(item.text())
                                 case 4:
-                                    encabezado = self.tablaCasos.horizontalHeaderItem(columna).text()
                                     fila_datos[encabezado] = int(item.text())
                                 case 5:
-                                    encabezado = self.tablaCasos.horizontalHeaderItem(columna).text()
                                     fila_datos[encabezado] = item.text()
                                 case 6:
-                                    encabezado = self.tablaCasos.horizontalHeaderItem(columna).text()
                                     fila_datos[encabezado] = float(item.text())
                                 case 7:
-                                    encabezado = self.tablaCasos.horizontalHeaderItem(columna).text()
                                     fila_datos[encabezado] = float(item.text())
                                 case 8:
-                                    encabezado = self.tablaCasos.horizontalHeaderItem(columna).text()
                                     fila_datos[encabezado] = float(item.text())
                                 case 9:
-                                    encabezado = self.tablaCasos.horizontalHeaderItem(columna).text()
                                     fila_datos[encabezado] = int(item.text())
                                 case 10:
-                                    encabezado = self.tablaCasos.horizontalHeaderItem(columna).text()
                                     fila_datos[encabezado] = item.text()
                         else:
                             fila_datos[self.tablaCasos.horizontalHeaderItem(columna).text()] = ""
@@ -897,6 +889,13 @@ class HMI(QMainWindow):
                 elif len(datos_tabla) > len(self.cases):
                     index = len(datos_tabla) - len(self.cases)
                     total = self.tablaCasos.rowCount() - index
+
+                    for i in range(len(self.cases)):
+                        if datos_tabla[i] == self.cases[i]:
+                            pass
+                        else:
+                            iden = datos_tabla[i].get("id")
+                            self.api.update_case(iden, datos_tabla[i])
 
                     for i in range(index):
                         self.api.create_case(datos_tabla[i + total])
