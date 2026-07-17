@@ -3,6 +3,8 @@
 # Comandos para instalar librerías requeridas, contando ya con Python (usamos versión 3.10.0):
 
 # pip install matplotlib python-snap7 PyQt5 requests pyserial
+import sonyilx_camera as ilx
+import numpy as np
 
 import json
 import sys
@@ -75,7 +77,9 @@ class HMI(QMainWindow):
         self.busqueda = None
         self.ser = None
         self.detector = cv2.QRCodeDetector()
-        self.cap = cv2.VideoCapture(0)
+        self.camera = ilx.CameraLibrary()
+        self.camera.initialize()
+        self.camera.connect_camera()
         self.last_data = ""
 
         self.timer = QTimer()
@@ -681,10 +685,8 @@ class HMI(QMainWindow):
 
     def update_frame(self):
 
-        ret, frame = self.cap.read()
-
-        if not ret:
-            return
+        live_view = self.camera.refresh_live_view()
+        frame = cv2.imread(live_view)
 
         data, bbox, _ = self.detector.detectAndDecode(frame)
 
@@ -1151,16 +1153,14 @@ class HMI(QMainWindow):
 
     def closeEvent(self, event):
 
-        event.accept()
-
         reply = QMessageBox.question(self, 'Salir',
                                      '¿Estás seguro de que quieres salir?',
                                      QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
 
         if reply == QMessageBox.Yes:
             self.timer.stop()
-
-            self.cap.release()
+            self.camera.disconnect_camera()
+            self.camera.shutdown()
 
             if self.ser is not None and self.ser.is_open:
                 self.ser.close()
