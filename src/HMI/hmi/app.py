@@ -3,10 +3,11 @@
 # Comandos para instalar librerías requeridas, contando ya con Python (usamos versión 3.10.0):
 
 # pip install matplotlib python-snap7 PyQt5 requests pyserial
-import sonyilx_camera as ilx
-from pathlib import Path
-
 import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent / 'vendor'))
+import sonyilx_camera as ilx
+
 import time
 import os
 
@@ -146,6 +147,7 @@ class HMI(QMainWindow):
         self.controlGroup = QGroupBox()
         self.controlGroup.setStyleSheet("background-color: #1e1e1e; color: whitesmoke; border-radius: 10px")
         self.controlGroup.setFont(QFont("Arial", 14))
+        self.controlGroup.setMaximumSize(2000, 125)
 
         self.casosGroup = QGroupBox()
         self.casosGroup.setStyleSheet("background-color: #1e1e1e; color: whitesmoke; border-radius: 10px")
@@ -341,26 +343,6 @@ class HMI(QMainWindow):
         self.mat7Edit.setStyleSheet("color: black; background-color: #dddcde; border-radius: 2px")
         self.mat7Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.label8 = QLabel("Proximidad:")
-        self.label8.setFont(QFont("Arial", 14))
-        self.label8.setStyleSheet("color: #dddcde")
-
-        self.mat8Edit = QLabel("> 6mm")
-        self.mat8Edit.setFont(QFont("Arial", 14))
-        self.mat8Edit.setFixedSize(150, 60)
-        self.mat8Edit.setStyleSheet("color: black; background-color: #dddcde; border-radius: 2px")
-        self.mat8Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-
-
-        self.labelParams2 = QLabel("Parametros Configurados")
-        self.labelParams2.setFont(QFont("Arial", 18))
-        self.labelParams2.setStyleSheet("color: #dddcde")
-        fuente = self.labelParams2.font()
-        fuente.setUnderline(True)
-        self.labelParams2.setFont(fuente)
-        self.labelParams2.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-
 
         self.conf1Edit = QLabel("...")
         self.conf1Edit.setFont(QFont("Arial", 14))
@@ -404,11 +386,6 @@ class HMI(QMainWindow):
         self.conf7Edit.setStyleSheet("color: black; background-color: #dddcde; border-radius: 2px")
         self.conf7Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.conf8Edit = QLabel("...")
-        self.conf8Edit.setFont(QFont("Arial", 14))
-        self.conf8Edit.setFixedSize(150, 60)
-        self.conf8Edit.setStyleSheet("color: black; background-color: #dddcde; border-radius: 2px")
-        self.conf8Edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.cases = self.fetch_cases()
         self.nombres = []
@@ -605,10 +582,7 @@ class HMI(QMainWindow):
         param_layout.addWidget(self.mat6Edit, 6, 1, Qt.AlignmentFlag.AlignTop)
         param_layout.addWidget(self.label7, 7, 0, Qt.AlignmentFlag.AlignTop)
         param_layout.addWidget(self.mat7Edit, 7, 1, Qt.AlignmentFlag.AlignTop)
-        param_layout.addWidget(self.label8, 8, 0, Qt.AlignmentFlag.AlignTop)
-        param_layout.addWidget(self.mat8Edit, 8, 1, Qt.AlignmentFlag.AlignTop)
 
-        param_layout.addWidget(self.labelParams2, 0, 2, Qt.AlignmentFlag.AlignTop)
         param_layout.addWidget(self.conf1Edit, 1, 2, Qt.AlignmentFlag.AlignTop)
         param_layout.addWidget(self.conf2Edit, 2, 2, Qt.AlignmentFlag.AlignTop)
         param_layout.addWidget(self.conf3Edit, 3, 2, Qt.AlignmentFlag.AlignTop)
@@ -616,7 +590,6 @@ class HMI(QMainWindow):
         param_layout.addWidget(self.conf5Edit, 5, 2, Qt.AlignmentFlag.AlignTop)
         param_layout.addWidget(self.conf6Edit, 6, 2, Qt.AlignmentFlag.AlignTop)
         param_layout.addWidget(self.conf7Edit, 7, 2, Qt.AlignmentFlag.AlignTop)
-        param_layout.addWidget(self.conf8Edit, 8, 2, Qt.AlignmentFlag.AlignTop)
 
         self.paramGroup.setLayout(param_layout)
 
@@ -716,6 +689,10 @@ class HMI(QMainWindow):
 
             self.alerts.escribirAlerta("Qr encontrado: " + str(data))
             self.buscarid(data)
+            time.sleep(2)
+            self.setParams()
+
+            self.connectPLC()
 
 
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -738,8 +715,6 @@ class HMI(QMainWindow):
         self.conf5Edit.setText(str(self.caso.get("Material")))
         self.conf6Edit.setText(str(self.caso.get("Grosor")))
         self.conf7Edit.setText(str(self.caso.get("Separacion")))
-        self.conf8Edit.setText(str(self.caso.get("Proximidad")))
-
 
 
     def case_changed(self, texto):
@@ -764,7 +739,6 @@ class HMI(QMainWindow):
             self.conf5Edit.setText(str(self.caso.get("Material")))
             self.conf6Edit.setText(str(self.caso.get("Grosor")))
             self.conf7Edit.setText(str(self.caso.get("Separacion")))
-            self.conf8Edit.setText(str(self.caso.get("Proximidad")))
 
 
         except Exception as e:
@@ -977,8 +951,7 @@ class HMI(QMainWindow):
                                     fila_datos[encabezado] = float(item.text())
                                 case 7:
                                     fila_datos[encabezado] = float(item.text())
-                                case 8:
-                                    fila_datos[encabezado] = float(item.text())
+
                                 case 9:
                                     fila_datos[encabezado] = int(item.text())
                                 case 10:
@@ -1033,7 +1006,8 @@ class HMI(QMainWindow):
                 num = self.texto
                 self.write_int(db_number=12, byte_offset=0, value=num)
 
-                #self.write_real() # Enviar tiempo de soldadura
+                tiempo = float(self.caso.get("Tiempo"))
+                #self.write_real(db_number=, byte_offset=0, value=tiempo) # Enviar tiempo de soldadura
                 self.alerts.escribirAlerta("Parametros configurados ✓")
 
             except Exception as e:
@@ -1059,9 +1033,8 @@ class HMI(QMainWindow):
 
     def temporizador(self, segundos):
         while segundos > 0:
-            signal = self.read_bool()
+            signal = self.read_bool() #Señal de terminación de ciclo
             if signal:
-                self.show_plot()
                 break
             time.sleep(1)
             segundos -= 1
@@ -1070,17 +1043,17 @@ class HMI(QMainWindow):
         if self.connected:
             try:
                 self.show_plot()
-                #self.write_bool()
+                self.write_bool() #Señal de activación de ciclo
 
-                #self.temporizador(segundos= 120)
+                self.temporizador(segundos= 40)
 
-                #signal = self.read_bool()
-                #if signal:
-                #    self.escribirAlerta("Ciclo completo")
-                #    self.show_plot()
+                signal = self.read_bool() # Señal de terminación de ciclo
+                if signal:
+                    self.show_plot()
+                    self.escribirAlerta("Ciclo completo")
 
-                #else:
-                #    self.escribirAlerta("Error. Error en el ciclo de soldadura")
+                else:
+                    self.escribirAlerta("Error. Error en el ciclo de soldadura")
 
             except Exception as e:
                 self.alerts.escribirAlerta("Error. Error al iniciar: " + str(e))
