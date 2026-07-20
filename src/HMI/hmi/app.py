@@ -4,14 +4,13 @@
 
 # pip install matplotlib python-snap7 PyQt5 requests pyserial
 import sonyilx_camera as ilx
-import numpy as np
+from pathlib import Path
 
-import json
 import sys
 import time
+import os
 
 import matplotlib
-import serial
 import snap7
 
 import cv2
@@ -78,16 +77,14 @@ class HMI(QMainWindow):
         self.ser = None
         self.detector = cv2.QRCodeDetector()
         self.camera = ilx.CameraLibrary()
-        self.camera.initialize()
-        self.camera.connect_camera()
+
         self.last_data = ""
 
         self.timer = QTimer()
-        self.timer.timeout.connect(self.update_frame)
-        self.timer.start(30)
+
 
         self.labelImagen = QLabel(self)
-        self.labelImagen.resize(800, 600)
+        #self.labelImagen.setMaximumSize(500, 1000)
 
         self.datos = {
               "Id" : "",
@@ -141,30 +138,32 @@ class HMI(QMainWindow):
         self.alerts = AlertLog()
         self.alerts2 = AlertLog()
 
-        self.paramGroup = QGroupBox("Parametros")
+        self.paramGroup = QGroupBox()
         self.paramGroup.setStyleSheet("background-color: #1e1e1e; color: whitesmoke; border-radius: 10px")
         self.paramGroup.setFont(QFont("Arial", 14))
+        self.paramGroup.setMaximumSize(640, 1100)
 
-        self.controlGroup = QGroupBox("Control")
+        self.controlGroup = QGroupBox()
         self.controlGroup.setStyleSheet("background-color: #1e1e1e; color: whitesmoke; border-radius: 10px")
         self.controlGroup.setFont(QFont("Arial", 14))
 
-        self.casosGroup = QGroupBox("Casos")
+        self.casosGroup = QGroupBox()
         self.casosGroup.setStyleSheet("background-color: #1e1e1e; color: whitesmoke; border-radius: 10px")
         self.casosGroup.setFont(QFont("Arial", 14))
 
-        self.control2Group = QGroupBox("Control")
+        self.control2Group = QGroupBox()
         self.control2Group.setStyleSheet("background-color: #1e1e1e; color: whitesmoke; border-radius: 10px")
         self.control2Group.setFont(QFont("Arial", 14))
         self.control2Group.setMaximumSize(2000, 450)
 
-        self.figure = Figure(figsize=(6, 4), dpi=100)  # Creación de espacio para graficar datos adquiridos del PLC
+        self.figure = Figure(figsize=(5, 4), dpi=100)  # Creación de espacio para graficar datos adquiridos del PLC
         self.canvas = FigureCanvas(self.figure)
-
+        self.canvas.setMaximumSize(400, 400)
         self.figure.set_facecolor('#1e1e1e')
 
-        self.figure2 = Figure(figsize=(6, 4), dpi=100)
+        self.figure2 = Figure(figsize=(5, 4), dpi=100)
         self.canvas2 = FigureCanvas(self.figure2)
+        self.canvas2.setMaximumSize(400, 400)
         self.figure2.set_facecolor('#1e1e1e')
 
         self.buttonstart = QPushButton("Iniciar")  # Creación y configuración de elementos incluidos en la GUI
@@ -265,12 +264,12 @@ class HMI(QMainWindow):
 
 
         self.labelParams1 = QLabel("Parametros ideales")
-        self.labelParams1.setFont(QFont("Arial", 20))
+        self.labelParams1.setFont(QFont("Arial", 18))
         self.labelParams1.setStyleSheet("color: #dddcde")
         fuente = self.labelParams1.font()
         fuente.setUnderline(True)
         self.labelParams1.setFont(fuente)
-        self.labelParams1.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.labelParams1.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         self.label1 = QLabel("Tiempo:")
         self.label1.setFont(QFont("Arial", 14))
@@ -355,7 +354,7 @@ class HMI(QMainWindow):
 
 
         self.labelParams2 = QLabel("Parametros Configurados")
-        self.labelParams2.setFont(QFont("Arial", 20))
+        self.labelParams2.setFont(QFont("Arial", 18))
         self.labelParams2.setStyleSheet("color: #dddcde")
         fuente = self.labelParams2.font()
         fuente.setUnderline(True)
@@ -553,7 +552,7 @@ class HMI(QMainWindow):
 
         self.tablaCasos.setHorizontalHeaderLabels(
             ["Nombre", "Tiempo", "Fuerza", "Compresion", "Pulsos", "Material", "Grosor", "Separacion",
-             "Proximidad", "id"])
+             "QR", "id"])
 
         for i in range(len(self.cases)):
             self.tablaCasos.setRowHeight(i, 80)
@@ -579,7 +578,16 @@ class HMI(QMainWindow):
                     case 7:
                         self.tablaCasos.setItem(i, j, QTableWidgetItem(str(self.cases[i].get("Separacion"))))
                     case 8:
-                        self.tablaCasos.setItem(i, j, QTableWidgetItem(str(self.cases[i].get("Proximidad"))))
+                        carpeta_actual = Path(__file__).parent
+                        iden = "qr_" + str(self.cases[i].get("id")) + ".png"
+
+                        ruta_archivo = carpeta_actual / 'utils' / 'QRCodes' / iden
+                        item_link = QTableWidgetItem(
+                            f'<a href="{ruta_archivo}" style="color:#0000EE; text-decoration:underline;">Abrir Archivo</a>')
+
+                        item_link.setData(Qt.ItemDataRole.UserRole, True)
+
+                        self.tablaCasos.setItem(i, j, item_link)
 
 
         param_layout.addWidget(self.labelParams1, 0, 0, 1, 2, Qt.AlignmentFlag.AlignTop)
@@ -622,11 +630,12 @@ class HMI(QMainWindow):
 
         self.controlGroup.setLayout(cntrl_layout)
 
+        main_layout.addWidget(self.controlGroup, 0, 0, 1, 4)
         main_layout.addWidget(self.paramGroup, 1, 0, 2, 1)
-        main_layout.addWidget(self.controlGroup, 0, 0, 1, 3)
-        main_layout.addWidget(self.labelImagen, 1, 1, 1, 1)
-        main_layout.addWidget(self.canvas2, 2, 1, 1, 1)
-        main_layout.addWidget(self.alerts, 1, 2, 2, 1)
+        main_layout.addWidget(self.labelImagen, 1, 1, 1, 2)
+        main_layout.addWidget(self.canvas, 2, 1, 1, 1)
+        main_layout.addWidget(self.canvas2, 2, 2, 1, 1)
+        main_layout.addWidget(self.alerts, 1, 3, 2, 1)
 
 
         # Pestaña 2
@@ -687,6 +696,8 @@ class HMI(QMainWindow):
 
         live_view = self.camera.refresh_live_view()
         frame = cv2.imread(live_view)
+
+        frame = frame[0:450, 0:810]
 
         data, bbox, _ = self.detector.detectAndDecode(frame)
 
@@ -791,7 +802,15 @@ class HMI(QMainWindow):
                     case 7:
                         self.tablaCasos.setItem(i, j, QTableWidgetItem(str(self.cases[i].get("Separacion"))))
                     case 8:
-                        self.tablaCasos.setItem(i, j, QTableWidgetItem(str(self.cases[i].get("Proximidad"))))
+                        carpeta_actual = Path(__file__).parent
+                        iden = "qr_" + str(self.cases[i].get("id")) + ".png"
+
+                        ruta_archivo = carpeta_actual / 'utils' / 'QRCodes' / iden
+                        item_link = QTableWidgetItem(f'<a href="{ruta_archivo}" style="color:#0000EE; text-decoration:underline;">Abrir Archivo</a>')
+
+                        item_link.setData(Qt.ItemDataRole.UserRole, True)
+
+                        self.tablaCasos.setItem(i, j, item_link)
 
         for row in range(self.tablaCasos.rowCount() - 1, -1, -1):
             item = self.tablaCasos.item(row, 0)
@@ -816,6 +835,19 @@ class HMI(QMainWindow):
         if item is not None:
             self.casoEliminar = item.text()
 
+        item2 = self.tablaCasos.item(row, column)
+        if item2 and item2.data(Qt.ItemDataRole.UserRole) == True:
+            # Extraer la ruta del enlace del texto HTML
+            texto_html = item2.text()
+            inicio = texto_html.find('href="') + 6
+            fin = texto_html.find('"', inicio)
+            ruta = texto_html[inicio:fin]
+
+            # Abrir el archivo con la aplicación predeterminada del sistema operativo
+            try:
+                os.system(f'xdg-open "{ruta}"')
+            except AttributeError:
+                self.alerts.escribirAlerta("Error")
 
     def borrar_caso(self):
         if self.confirm:
@@ -869,8 +901,8 @@ class HMI(QMainWindow):
 
     def connectPLC(self):  # Función para establecer conexión
         try:
-            self.ser = serial.Serial(self.puerto, self.baudios, timeout=1)
-            time.sleep(2)
+            #self.ser = serial.Serial(self.puerto, self.baudios, timeout=1)
+            #time.sleep(2)
 
             self.plc.disconnect()
             self.plc.connect(PLC_HOST, rack=PLC_RACK, slot=PLC_SLOT)
@@ -883,6 +915,21 @@ class HMI(QMainWindow):
         except Exception as e:
             self.buttonconnect.setStyleSheet("background-color: red")
             self.alerts.escribirAlerta("Error. Error al conectar: " + str(e))
+
+        try:
+            self.camera.initialize()
+            self.camera.connect_camera()
+
+            time.sleep(2)
+            self.timer.timeout.connect(self.update_frame)
+            self.timer.start(30)
+
+            self.alerts.escribirAlerta("Conectado a cámara.")
+
+        except Exception as e:
+            self.buttonconnect.setStyleSheet("background-color: red")
+            self.alerts.escribirAlerta("Error. Error al conectar: " + str(e))
+
 
 
     def load_image(self):
@@ -1044,34 +1091,19 @@ class HMI(QMainWindow):
 
     def show_plot(self):
 
-        if self.ser is not None and self.ser.is_open:
+        if self.connected:
             try:
                 self.max = 0
                 self.maxcurr = 0
-                index = 0
+                num = self.texto
 
                 self.figure.clear()
                 self.figure2.clear()
 
-                # Leer datos recibidos
-                if self.ser.in_waiting > 0:
-                    data = self.ser.readline().decode('utf-8').rstrip()
-                    #print(f"Recibido: {respuesta}")
 
-                    linea = json.loads(data)
-
-                    respuesta = [int(i) for i in linea]
-
-                    self.current_array = [(i * 58.59) - 30000 for i in respuesta ]
-
-                    for j in range(len(self.current_array)):
-                        self.time_array.append(index)
-                        index += 0.0002
-
-
-                #self.time_array = self.read_dword_array(db_number=13, start_byte=0, bytes=num)
-                #self.force_array = self.read_real_array(db_number=1, start_byte=0, bytes=num)
-                #self.current_array = self.read_real_array(db_number=15, start_byte=0, bytes=num)
+                self.time_array = self.read_dword_array(db_number=13, start_byte=0, count=num)
+                self.force_array = self.read_real_array(db_number=1, start_byte=0, count=num)
+                self.current_array = self.read_real_array(db_number=15, start_byte=0, count=num)
 
                 if len(self.time_array) and len(self.force_array) > 5:
                     for i in range(len(self.force_array)):
@@ -1095,11 +1127,11 @@ class HMI(QMainWindow):
                     f"N. de muestras: {self.texto} | "
                     f"F máxima: {self.max} N \n"
                     f"Fecha: {self.fecha_formateada}"
-                    , fontweight='bold', fontsize=8, color = '#dddcde'
+                    , fontweight='bold', fontsize=6, color = '#dddcde'
                 )
 
-                ax.legend()
-                style_axis(ax, "Tiempo", "Fuerza")
+                #ax.legend()
+                style_axis(ax, "", "")
                 self.canvas.draw()  # Refresca el lienzo
 
                 ax2 = self.figure2.add_subplot(111)
@@ -1111,10 +1143,10 @@ class HMI(QMainWindow):
                     f"N. de muestras: {self.texto} | "
                     f"I máxima: {self.maxcurr} A \n"
                     f"Fecha: {self.fecha_formateada}"
-                    , fontweight='bold', fontsize=8, color = '#dddcde'
+                    , fontweight='bold', fontsize=6, color = '#dddcde'
                 )
-                ax2.legend()
-                style_axis(ax2, "Tiempo", "Corriente")
+                #ax2.legend()
+                style_axis(ax2, "", "")
                 self.canvas2.draw()  # Refresca el lienzo
 
                 self.alerts.escribirAlerta("Datos obtenidos correctamente ✓")
