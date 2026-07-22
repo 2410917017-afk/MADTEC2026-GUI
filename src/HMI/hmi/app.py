@@ -5,7 +5,6 @@
 # pip install matplotlib python-snap7 PyQt5 requests pyserial
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent / 'vendor'))
 import sonyilx_camera as ilx
 
 import time
@@ -58,6 +57,11 @@ class HMI(QMainWindow):
         self.pestana2 = QWidget()
         self.layout_pestana2 = QGridLayout()
 
+        # --- Pestaña 2 ---
+        self.pestana3 = QWidget()
+        self.layout_pestana3 = QGridLayout()
+
+
         main_layout = QGridLayout()  # Distribución de rejilla, renglones y columnas
         main_layout.setContentsMargins(30, 30, 30, 30)
         param_layout = QGridLayout()
@@ -69,6 +73,9 @@ class HMI(QMainWindow):
         cntrl2_layout.setContentsMargins(10, 20, 10, 20)
         casos_layout = QGridLayout()
         casos_layout.setContentsMargins(60, 35, 60, 35)
+
+        cntrl3_layout = QGridLayout()
+        cntrl3_layout.setContentsMargins(30, 30, 30, 30)
 
         self.base_url = BASE_URL
         self.api = ApiClient(self.base_url)
@@ -82,10 +89,12 @@ class HMI(QMainWindow):
         self.last_data = ""
 
         self.timer = QTimer()
+        self.zoom = None
 
 
         self.labelImagen = QLabel(self)
         #self.labelImagen.setMaximumSize(500, 1000)
+        self.label2Imagen = QLabel(self)
 
         self.datos = {
               "Id" : "",
@@ -156,7 +165,12 @@ class HMI(QMainWindow):
         self.control2Group = QGroupBox()
         self.control2Group.setStyleSheet("background-color: #1e1e1e; color: whitesmoke; border-radius: 10px")
         self.control2Group.setFont(QFont("Arial", 14))
-        self.control2Group.setMaximumSize(2000, 450)
+        self.control2Group.setMaximumSize(2000, 125)
+
+        self.control3Group = QGroupBox()
+        self.control3Group.setStyleSheet("background-color: #1e1e1e; color: whitesmoke; border-radius: 10px")
+        self.control3Group.setFont(QFont("Arial", 14))
+        self.control3Group.setMaximumSize(2000, 125)
 
         self.figure = Figure(figsize=(5, 4), dpi=100)  # Creación de espacio para graficar datos adquiridos del PLC
         self.canvas = FigureCanvas(self.figure)
@@ -566,6 +580,47 @@ class HMI(QMainWindow):
 
                         self.tablaCasos.setItem(i, j, item_link)
 
+        #Widgets de pestaña3
+        self.buttonZP = QPushButton("+")
+        self.buttonZP.setFont(QFont("Arial", 20))
+        self.buttonZP.setFixedSize(80, 80)
+        self.buttonZP.setStyleSheet("""
+                                                          QPushButton {
+                                                          background-color: #494be7; 
+                                                          color: silver; border: none; 
+                                                          color: #dddcde; border: none; 
+                                                          border-radius: 34px; 
+                                                          padding: 10px 10px
+                                                          }
+                                                          QPushButton:hover {
+                                                          background-color: #9193FF;
+                                                          }
+                                                          QPushButton:pressed {
+                                                          padding: 11px 9px 9px 11px;
+                                                          }
+                                                          """)
+        self.buttonZP.clicked.connect(self.zoomPlus)
+
+        self.buttonZM = QPushButton("-")
+        self.buttonZM.setFont(QFont("Arial", 20))
+        self.buttonZM.setFixedSize(80, 80)
+        self.buttonZM.setStyleSheet("""
+                                                                  QPushButton {
+                                                                  background-color: #494be7; 
+                                                                  color: silver; border: none; 
+                                                                  color: #dddcde; border: none; 
+                                                                  border-radius: 34px; 
+                                                                  padding: 10px 10px
+                                                                  }
+                                                                  QPushButton:hover {
+                                                                  background-color: #9193FF;
+                                                                  }
+                                                                  QPushButton:pressed {
+                                                                  padding: 11px 9px 9px 11px;
+                                                                  }
+                                                                  """)
+        self.buttonZM.clicked.connect(self.zoomMinus)
+
 
         param_layout.addWidget(self.labelParams1, 0, 0, 1, 2, Qt.AlignmentFlag.AlignTop)
         param_layout.addWidget(self.label1, 1, 0, Qt.AlignmentFlag.AlignTop)
@@ -620,6 +675,15 @@ class HMI(QMainWindow):
 
         casos_layout.addWidget(self.tablaCasos)
 
+        cntrl3_layout.addWidget(self.buttonZP, 0, 0)
+        cntrl3_layout.addWidget(self.buttonZM, 0, 1)
+
+        self.control3Group.setLayout(cntrl3_layout)
+
+        self.layout_pestana3.addWidget(self.control3Group)
+        self.layout_pestana3.addWidget(self.label2Imagen)
+
+        self.pestana3.setLayout(self.layout_pestana3)
 
         self.control2Group.setLayout(cntrl2_layout)
         self.casosGroup.setLayout(casos_layout)
@@ -635,6 +699,7 @@ class HMI(QMainWindow):
 
         self.tabs.addTab(self.pestana1, "Inicio")
         self.tabs.addTab(self.pestana2, "Configuración")
+        self.tabs.addTab(self.pestana3, "Cámara")
         self.tabs.setStyleSheet("color: whitesmoke")
         self.tabs.setFont(QFont("Arial", 14))
 
@@ -702,6 +767,17 @@ class HMI(QMainWindow):
         image = QImage(rgb.data, w, h, ch * w, QImage.Format_RGB888)
 
         self.labelImagen.setPixmap(QPixmap.fromImage(image))
+        self.label2Imagen.setPixmap(QPixmap.fromImage(image))
+
+    def zoomPlus(self):
+        self.zoom = self.zoom + 100
+        self.camera.set_zoom_position(self.zoom)  # Sin zoom
+        print(self.zoom)
+
+    def zoomMinus(self):
+        self.zoom = self.zoom - 100
+        self.camera.set_zoom_position(self.zoom )  # Sin zoom
+        print(self.zoom)
 
     def buscarid(self, text):
         ident = int(text)
@@ -897,6 +973,9 @@ class HMI(QMainWindow):
             time.sleep(2)
             self.timer.timeout.connect(self.update_frame)
             self.timer.start(30)
+            self.zoom = self.camera.zoom_position()
+            print(self.zoom)
+            print(self.camera.zoom_position_minimum(), "-", self.camera.zoom_position_maximum())
 
             self.alerts.escribirAlerta("Conectado a cámara.")
 
@@ -1043,7 +1122,9 @@ class HMI(QMainWindow):
         if self.connected:
             try:
                 self.show_plot()
-                self.write_bool() #Señal de activación de ciclo
+                self.write_bool(db=5, byte_offset=12, bit=0, value= 1) #Señal de activación de ciclo
+                time.sleep(1)
+                self.write_bool(db=5, byte_offset=12, bit=0, value= 0)
 
                 self.temporizador(segundos= 40)
 

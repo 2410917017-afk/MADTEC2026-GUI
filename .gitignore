@@ -29,3 +29,4 @@ src/HMI/Plots/
 # OS
 .DS_Store
 Thumbs.db
+/src/HMI/hmi/LiveView000000.JPG

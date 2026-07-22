@@ -1,7 +1,4 @@
 matplotlib
-PyQt5
 python-snap7
-pyserial
 requests
 pyinstaller
-opencv-python-headless
