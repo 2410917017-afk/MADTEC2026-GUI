@@ -570,9 +570,9 @@ class HMI(QMainWindow):
                     case 7:
                         self.tablaCasos.setItem(i, j, QTableWidgetItem(str(self.cases[i].get("Separacion"))))
                     case 8:
-                        iden = "QRCodes/qr_" + str(self.cases[i].get("id")) + ".png"
+                        iden = "utils/QRCodes/qr_" + str(self.cases[i].get("id")) + ".png"
 
-                        ruta_archivo = self.obtener_ruta_recurso(os.path.join('utils', iden))
+                        ruta_archivo = self.obtener_ruta_recurso(os.path.join('hmi', iden))
                         item_link = QTableWidgetItem(
                             f'<a href="{ruta_archivo}" style="color:#0000EE; text-decoration:underline;">Abrir Archivo</a>')
 
