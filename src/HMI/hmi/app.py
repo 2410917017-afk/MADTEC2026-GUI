@@ -6,6 +6,7 @@
 import sys
 from pathlib import Path
 import sonyilx_camera as ilx
+import subprocess
 
 import time
 import os
@@ -569,10 +570,9 @@ class HMI(QMainWindow):
                     case 7:
                         self.tablaCasos.setItem(i, j, QTableWidgetItem(str(self.cases[i].get("Separacion"))))
                     case 8:
-                        carpeta_actual = Path(__file__).parent
-                        iden = "qr_" + str(self.cases[i].get("id")) + ".png"
+                        iden = "QRCodes/qr_" + str(self.cases[i].get("id")) + ".png"
 
-                        ruta_archivo = carpeta_actual / 'utils' / 'QRCodes' / iden
+                        ruta_archivo = self.obtener_ruta_recurso(os.path.join('utils', iden))
                         item_link = QTableWidgetItem(
                             f'<a href="{ruta_archivo}" style="color:#0000EE; text-decoration:underline;">Abrir Archivo</a>')
 
@@ -702,6 +702,7 @@ class HMI(QMainWindow):
         self.tabs.addTab(self.pestana3, "Cámara")
         self.tabs.setStyleSheet("color: whitesmoke")
         self.tabs.setFont(QFont("Arial", 14))
+        #self.alerts.escribirAlerta(str(ilx.debug_enumerate_cameras()))
 
 
     def fetch_cases(self):
@@ -731,43 +732,53 @@ class HMI(QMainWindow):
         plc_write_bool(self.plc, db, byte_offset, bit, value)
 
     def update_frame(self):
+        if self.camera.is_connected():
+            try:
 
-        live_view = self.camera.refresh_live_view()
-        frame = cv2.imread(live_view)
+                live_view = self.camera.refresh_live_view()
+                frame = cv2.imread(live_view)
 
-        frame = frame[0:450, 0:810]
+                frame = frame[0:450, 0:810]
 
-        data, bbox, _ = self.detector.detectAndDecode(frame)
+                data, bbox, _ = self.detector.detectAndDecode(frame)
 
-        if bbox is not None:
+                if bbox is not None:
 
-            pts = bbox.astype(int)
+                    pts = bbox.astype(int)
 
-            for i in range(len(pts)):
-                p1 = tuple(pts[i][0])
-                p2 = tuple(pts[(i + 1) % len(pts)][0])
-                cv2.line(frame, p1, p2, (0, 255, 0), 2)
+                    for i in range(len(pts)):
+                        p1 = tuple(pts[i][0])
+                        p2 = tuple(pts[(i + 1) % len(pts)][0])
+                        cv2.line(frame, p1, p2, (0, 255, 0), 2)
 
-        if data and data != self.last_data:
+                if data and data != self.last_data:
 
-            self.last_data = data
+                    self.last_data = data
 
-            self.alerts.escribirAlerta("Qr encontrado: " + str(data))
-            self.buscarid(data)
-            time.sleep(2)
-            self.setParams()
+                    self.alerts.escribirAlerta("Qr encontrado: " + str(data))
+                    self.buscarid(data)
+                    time.sleep(2)
+                    self.setParams()
 
-            self.connectPLC()
+                    self.iniciar_PLC()
 
 
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-        h, w, ch = rgb.shape
+                h, w, ch = rgb.shape
 
-        image = QImage(rgb.data, w, h, ch * w, QImage.Format_RGB888)
+                image = QImage(rgb.data, w, h, ch * w, QImage.Format_RGB888)
 
-        self.labelImagen.setPixmap(QPixmap.fromImage(image))
-        self.label2Imagen.setPixmap(QPixmap.fromImage(image))
+                self.labelImagen.setPixmap(QPixmap.fromImage(image))
+                self.label2Imagen.setPixmap(QPixmap.fromImage(image))
+
+            except Exception as e:
+                self.alerts.escribirAlerta("Error. Error tomar video" + str(e))
+                self.camera.disconnect_camera()
+                self.camera.shutdown()
+
+        else:
+            self.alerts.escribirAlerta("Error. Cámara no conectada.")
 
     def zoomPlus(self):
         self.zoom = self.zoom + 100
@@ -792,6 +803,15 @@ class HMI(QMainWindow):
         self.conf6Edit.setText(str(self.caso.get("Grosor")))
         self.conf7Edit.setText(str(self.caso.get("Separacion")))
 
+    def obtener_ruta_recurso(self, ruta_relativa):
+        """ Obtiene la ruta absoluta al recurso tanto en desarrollo como en el ejecutable de PyInstaller """
+        try:
+            # PyInstaller crea una carpeta temporal y guarda la ruta en _MEIPASS
+            base_path = sys._MEIPASS
+        except Exception:
+            base_path = os.path.abspath(".")
+
+        return os.path.join(base_path, ruta_relativa)
 
     def case_changed(self, texto):
         try:
@@ -852,10 +872,10 @@ class HMI(QMainWindow):
                     case 7:
                         self.tablaCasos.setItem(i, j, QTableWidgetItem(str(self.cases[i].get("Separacion"))))
                     case 8:
-                        carpeta_actual = Path(__file__).parent
-                        iden = "qr_" + str(self.cases[i].get("id")) + ".png"
 
-                        ruta_archivo = carpeta_actual / 'utils' / 'QRCodes' / iden
+                        iden = "QRCodes/qr_" + str(self.cases[i].get("id")) + ".png"
+
+                        ruta_archivo = self.obtener_ruta_recurso(os.path.join('utils', iden))
                         item_link = QTableWidgetItem(f'<a href="{ruta_archivo}" style="color:#0000EE; text-decoration:underline;">Abrir Archivo</a>')
 
                         item_link.setData(Qt.ItemDataRole.UserRole, True)
@@ -895,9 +915,9 @@ class HMI(QMainWindow):
 
             # Abrir el archivo con la aplicación predeterminada del sistema operativo
             try:
-                os.system(f'xdg-open "{ruta}"')
-            except AttributeError:
-                self.alerts.escribirAlerta("Error")
+                subprocess.run(['xdg-open', ruta])
+            except subprocess.CalledProcessError as e:
+                print(f"Error al abrir el archivo: {e}")
 
     def borrar_caso(self):
         if self.confirm:
@@ -951,8 +971,6 @@ class HMI(QMainWindow):
 
     def connectPLC(self):  # Función para establecer conexión
         try:
-            #self.ser = serial.Serial(self.puerto, self.baudios, timeout=1)
-            #time.sleep(2)
 
             self.plc.disconnect()
             self.plc.connect(PLC_HOST, rack=PLC_RACK, slot=PLC_SLOT)
@@ -964,24 +982,25 @@ class HMI(QMainWindow):
 
         except Exception as e:
             self.buttonconnect.setStyleSheet("background-color: red")
-            self.alerts.escribirAlerta("Error. Error al conectar: " + str(e))
+            self.alerts.escribirAlerta("Error. Error al conectar PLC: " + str(e))
 
         try:
             self.camera.initialize()
             self.camera.connect_camera()
 
             time.sleep(2)
-            self.timer.timeout.connect(self.update_frame)
-            self.timer.start(30)
-            self.zoom = self.camera.zoom_position()
-            print(self.zoom)
-            print(self.camera.zoom_position_minimum(), "-", self.camera.zoom_position_maximum())
+            if self.camera.is_connected():
+                self.timer.timeout.connect(self.update_frame)
+                self.timer.start(30)
+                self.zoom = self.camera.zoom_position()
+                #print(self.zoom)
+                #print(self.camera.zoom_position_minimum(), "-", self.camera.zoom_position_maximum())
 
-            self.alerts.escribirAlerta("Conectado a cámara.")
+                self.alerts.escribirAlerta("Conectado a cámara.")
 
         except Exception as e:
             self.buttonconnect.setStyleSheet("background-color: red")
-            self.alerts.escribirAlerta("Error. Error al conectar: " + str(e))
+            self.alerts.escribirAlerta("Error. Error al conectar camara: " + str(e))
 
 
 
@@ -1011,7 +1030,6 @@ class HMI(QMainWindow):
                         # Verificar si el item no está vacío o nulo
                         if item is not None:
                             encabezado = self.tablaCasos.horizontalHeaderItem(columna).text()
-
 
                             match columna:
                                 case 0:

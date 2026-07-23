@@ -9,8 +9,9 @@ hmi_src = project_root / "src" / "HMI"
 a = Analysis(
     [str(hmi_src / "HMI_python.py")],
     pathex=[str(hmi_src)],
-    binaries=[("/home/cetevi/miniconda3/lib/libexpat.so.1", ".")],
-    datas=[(str(hmi_src / "Plots"), "Plots"), (str(hmi_src / "hmi" / "utils" / "QRCodes"), "QRCodes")],
+    binaries=[("/home/cetevi/miniconda3/lib/libexpat.so.1", ".")
+              ],
+    datas=[(str(hmi_src / "Plots" ), "Plots"), (str(hmi_src / "hmi" / "utils" / "QRCodes"), "QRCodes")],
     hiddenimports=["snap7", "serial"],
     hookspath=[],
     hooksconfig={},
