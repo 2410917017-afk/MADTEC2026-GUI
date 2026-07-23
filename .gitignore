@@ -17,6 +17,7 @@ Plots/
 src/HMI/Plots/
 *.csv
 *.json
+src/HMI/hmi/global_app_parameters.json
 
 # Environment files
 .env

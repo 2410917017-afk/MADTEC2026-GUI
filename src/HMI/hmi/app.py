@@ -38,6 +38,14 @@ from hmi.services.plc import (
 )
 from hmi.utils.plotting import style_axis
 from hmi.widgets import AlertLog
+import platform
+
+IS_WINDOWS = platform.system() == "Windows"
+IS_LINUX = platform.system() == "Linux"
+IS_MAC = platform.system() == "Darwin"
+
+IS_ARM = platform.machine() in ("aarch64", "arm64")
+IS_X86 = platform.machine() == "x86_64"
 
 
 # Inicialización de interfaz gráfica
@@ -570,9 +578,16 @@ class HMI(QMainWindow):
                     case 7:
                         self.tablaCasos.setItem(i, j, QTableWidgetItem(str(self.cases[i].get("Separacion"))))
                     case 8:
-                        iden = "utils/QRCodes/qr_" + str(self.cases[i].get("id")) + ".png"
+                        if IS_X86:
+                            iden = "QRCodes/qr_" + str(self.cases[i].get("id")) + ".png"
 
-                        ruta_archivo = self.obtener_ruta_recurso(os.path.join('hmi', iden))
+                            ruta_archivo = self.obtener_ruta_recurso(os.path.join('utils', iden))
+                        elif IS_ARM:
+                            iden = "utils/QRCodes/qr_" + str(self.cases[i].get("id")) + ".png"
+
+                            ruta_archivo = self.obtener_ruta_recurso(os.path.join('hmi', iden))
+
+
                         item_link = QTableWidgetItem(
                             f'<a href="{ruta_archivo}" style="color:#0000EE; text-decoration:underline;">Abrir Archivo</a>')
 
@@ -872,10 +887,15 @@ class HMI(QMainWindow):
                     case 7:
                         self.tablaCasos.setItem(i, j, QTableWidgetItem(str(self.cases[i].get("Separacion"))))
                     case 8:
+                        if IS_X86:
+                            iden = "QRCodes/qr_" + str(self.cases[i].get("id")) + ".png"
 
-                        iden = "QRCodes/qr_" + str(self.cases[i].get("id")) + ".png"
+                            ruta_archivo = self.obtener_ruta_recurso(os.path.join('utils', iden))
+                        elif IS_ARM:
+                            iden = "utils/QRCodes/qr_" + str(self.cases[i].get("id")) + ".png"
 
-                        ruta_archivo = self.obtener_ruta_recurso(os.path.join('utils', iden))
+                            ruta_archivo = self.obtener_ruta_recurso(os.path.join('hmi', iden))
+
                         item_link = QTableWidgetItem(f'<a href="{ruta_archivo}" style="color:#0000EE; text-decoration:underline;">Abrir Archivo</a>')
 
                         item_link.setData(Qt.ItemDataRole.UserRole, True)
