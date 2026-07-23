@@ -16,6 +16,7 @@ dist/
 Plots/
 src/HMI/Plots/
 *.csv
+*.json
 
 # Environment files
 .env
