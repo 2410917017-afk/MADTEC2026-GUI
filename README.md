@@ -1,4 +1,4 @@
-# MADTEC2026-GUI 🤖
+# MADTEC2026-GUI
 
 > Sistema de adquisición de datos e interfaz gráfica para control de robot industrial ABB con soldadura por puntos.
 
@@ -6,7 +6,7 @@ Repositorio que recopila la programación Python y modelos CAD para análisis de
 
 ---
 
-## 📋 Descripción Rápida
+##  Descripción Rápida
 
 Este proyecto implementa una **interfaz gráfica (HMI)** en Python/PyQt5 para:
 - **Controlar** el robot ABB mediante conexión Snap7 al PLC
@@ -18,7 +18,7 @@ Este proyecto implementa una **interfaz gráfica (HMI)** en Python/PyQt5 para:
 
 ---
 
-## 🗂️ Estructura del Repositorio
+##  Estructura del Repositorio
 
 ```
 MADTEC2026-GUI/
@@ -54,10 +54,10 @@ MADTEC2026-GUI/
 
 ---
 
-## 🚀 Inicio Rápido
+##  Inicio Rápido
 
 ### Requisitos
-- **Python 3.8+**
+- **Python 3.10**
 - **Linux** (Tested en Ubuntu 20.04, Jetson)
 - Conexión a PLC ABB y backend API REST
 
@@ -122,7 +122,7 @@ Ver [packaging/README_HMI.md](packaging/README_HMI.md) para compilar con PyInsta
 
 ---
 
-## 🎨 Interfaz Gráfica (Tabs)
+##  Interfaz Gráfica (Tabs)
 
 ### Tab 1: **Inicio** (Adquisición de datos)
 - **Conectar**: Establece conexión con PLC y cámara
@@ -147,7 +147,7 @@ Ver [packaging/README_HMI.md](packaging/README_HMI.md) para compilar con PyInsta
 
 ---
 
-## 🔧 Configuración Avanzada
+##  Configuración Avanzada
 
 ### Cambiar Estilos
 En `src/HMI/hmi/app.py`, busca `setStyleSheet`:
@@ -175,7 +175,7 @@ self.buttonstart.setStyleSheet("""
 
 ---
 
-## 📡 Dependencias Principales
+##  Dependencias Principales
 
 ```
 PyQt5              # Interfaz gráfica
@@ -190,12 +190,12 @@ Ver `requirements.txt` para versiones exactas.
 
 ---
 
-## 🐛 Solución de Problemas
+##  Solución de Problemas
 
 ### Error: "No module named 'sonyilx_camera'"
-```bash
-pip install sonyilx-camera
-```
+
+-Instalar librería Sonyilx (Revisar archivo Help.md)
+
 
 ### Error: "Connection refused" al PLC
 - Verificar IP en `config.py` (debe coincidir con PLC)
@@ -211,7 +211,7 @@ pip install sonyilx-camera
 
 ---
 
-## 📊 Flujo de Datos
+##  Flujo de Datos
 
 ```
 PLC (ABB)
@@ -227,7 +227,7 @@ PLC (ABB)
 
 ---
 
-## 📝 Edición de Código
+##  Edición de Código
 
 ### Agregar Nueva Funcionalidad
 
@@ -263,29 +263,8 @@ Cambiar `db_number`, `start_byte` según configuración de memoria PLC.
 
 ---
 
-## 🔐 Seguridad
-
-- **Autenticación**: [EDITAR - Añadir si aplica]
-- **Validación**: Validar entrada de usuario antes de enviar a PLC
-- **Conexiones**: HTTPS con certificados [EDITAR si aplica]
-
----
-
-## 📞 Contacto y Soporte
-
-- Revisar documentación en `docs/`
-- Abrir [issue](../../issues) en GitHub
-- Contactar al equipo de desarrollo
-
----
-
-## 📄 Licencia
-
-[EDITAR - Especificar licencia]
-
----
 
 **Última actualización:** Julio 2026  
 **Estado:** En desarrollo  
-**Versión Python:** 3.8+  
+**Versión Python:** 3.10  
 **Sistemas Soportados:** Linux x86_64, ARM64 (Jetson)
