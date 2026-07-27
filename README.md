@@ -47,7 +47,6 @@ MADTEC2026-GUI/
 ├── CAD/                             # Modelos 3D y planos (si aplica)
 ├── docs/                            # Documentación adicional
 ├── requirements.txt                 # Dependencias Python
-├── Abrir.txt                        # Instrucciones rápidas de ejecución
 ├── .gitignore
 └── README.md                        # Este archivo
 ```
