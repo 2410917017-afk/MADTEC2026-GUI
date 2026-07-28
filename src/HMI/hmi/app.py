@@ -480,9 +480,8 @@ class HMI(QMainWindow):
         self.buttonBorrar.setFixedSize(220, 75)
         self.buttonBorrar.setStyleSheet("""
                                           QPushButton {
-                                          background-color: #494be7; 
+                                          background-color: red; 
                                           color: silver; border: none; 
-                                          color: #dddcde; border: none; 
                                           border-radius: 34px; 
                                           padding: 10px 10px
                                           }
