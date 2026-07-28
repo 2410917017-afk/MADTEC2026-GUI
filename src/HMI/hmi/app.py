@@ -42,7 +42,6 @@ import platform
 
 IS_WINDOWS = platform.system() == "Windows"
 IS_LINUX = platform.system() == "Linux"
-IS_MAC = platform.system() == "Darwin"
 
 IS_ARM = platform.machine() in ("aarch64", "arm64")
 IS_X86 = platform.machine() == "x86_64"
