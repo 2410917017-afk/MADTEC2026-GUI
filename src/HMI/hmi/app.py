@@ -30,6 +30,7 @@ from hmi.config import BASE_URL, PLC_HOST, PLC_RACK, PLC_SLOT, PLOTS_DIR, SERIAL
 from hmi.services.api_client import ApiClient
 from hmi.services.plc import (
     read_bool as plc_read_bool,
+    read_byte_array as plc_read_byte_array,
     read_dword_array as plc_read_dword_array,
     read_int_array as plc_read_int_array,
     read_real_array as plc_read_real_array,
@@ -208,7 +209,7 @@ class HMI(QMainWindow):
                                   }
                                   """)
         self.buttonstart.clicked.connect(self.actualizar_nombre)  # Llamada a funciones que ejecutan el comportamiento de botones
-        self.buttonstart.clicked.connect(self.iniciar_PLC)
+        self.buttonstart.clicked.connect(self.show_plot)
 
         self.buttonconnect = QPushButton("Conectar")
         self.buttonconnect.setFont(QFont("Arial", 20))
@@ -735,6 +736,9 @@ class HMI(QMainWindow):
     def read_dword_array(self, db_number, start_byte, count):
         return plc_read_dword_array(self.plc, db_number, start_byte, count)
 
+    def read_byte_array(self, db_number, start_byte, count):
+        return plc_read_byte_array(self.plc, db_number, start_byte, count)
+
     def read_real_array(self, db_number, start_byte, count):
         return plc_read_real_array(self.plc, db_number, start_byte, count)
 
@@ -1002,25 +1006,6 @@ class HMI(QMainWindow):
             self.buttonconnect.setStyleSheet("background-color: red")
             self.alerts.escribirAlerta("Error. Error al conectar PLC: " + str(e))
 
-        try:
-            self.camera.initialize()
-            self.camera.connect_camera()
-
-            time.sleep(2)
-            if self.camera.is_connected():
-                self.timer.timeout.connect(self.update_frame)
-                self.timer.start(30)
-                self.zoom = self.camera.zoom_position()
-                #print(self.zoom)
-                #print(self.camera.zoom_position_minimum(), "-", self.camera.zoom_position_maximum())
-
-                self.alerts.escribirAlerta("Conectado a cámara.")
-
-        except Exception as e:
-            self.buttonconnect.setStyleSheet("background-color: red")
-            self.alerts.escribirAlerta("Error. Error al conectar camara: " + str(e))
-
-
 
     def load_image(self):
         if self.connected:
@@ -1108,8 +1093,7 @@ class HMI(QMainWindow):
     def updatesamp(self, text):  # Funciones para comportamiento de botones y conexión a PLC
         if text != "":
             try:
-                num = text
-                self.texto = int(num)
+                self.texto = int(text)
             except Exception:
                 self.alerts.escribirAlerta("Error. En este campo solo puede ingresar números enteros.")
                 self.samplesEdit.setText("")
@@ -1157,7 +1141,7 @@ class HMI(QMainWindow):
     def iniciar_PLC(self):
         if self.connected:
             try:
-                self.show_plot()
+
                 self.write_bool(db=5, byte_offset=12, bit=0, value= 1) #Señal de activación de ciclo
                 time.sleep(1)
                 self.write_bool(db=5, byte_offset=12, bit=0, value= 0)
@@ -1186,69 +1170,115 @@ class HMI(QMainWindow):
                 self.max = 0
                 self.maxcurr = 0
                 num = self.texto
+                data = []
+                numeros = []
+                values = ""
+                dato = ""
+
+                index = -0.0002
 
                 self.figure.clear()
                 self.figure2.clear()
 
 
-                self.time_array = self.read_dword_array(db_number=13, start_byte=0, count=num)
-                self.force_array = self.read_real_array(db_number=1, start_byte=0, count=num)
-                self.current_array = self.read_real_array(db_number=15, start_byte=0, count=num)
+                data = self.read_byte_array(db_number=2, start_byte=0, count=500)
 
-                if len(self.time_array) and len(self.force_array) > 5:
-                    for i in range(len(self.force_array)):
+                values = str(data)
+                for i, letra in enumerate(values):
+                    if i > 15:
+                        if letra == ",":
+                            numeros.append(int(dato))
+                            dato = ""
+                        else:
+                            dato = dato + letra
 
-                        if self.force_array[i] > self.max:
-                            self.max = self.force_array[i]
+                data = []
+                values = ""
+                dato = ""
 
-                    for i in range(len(self.current_array)):
+                data = self.read_byte_array(db_number=6, start_byte=0, count=500)
 
-                        if self.current_array[i] > self.maxcurr:
-                            self.maxcurr = self.current_array[i]
+                values = str(data)
+                for i, letra in enumerate(values):
+                    if i > 15:
+                        if letra == ",":
+                            numeros.append(int(dato))
+                            dato = ""
+                        else:
+                            dato = dato + letra
 
-                    self.tSoldadura = self.time_array[len(self.time_array) - 1]
+                data = []
+                values = ""
+                dato = ""
+
+                data = self.read_byte_array(db_number=7, start_byte=0, count=500)
+
+                values = str(data)
+                for i, letra in enumerate(values):
+                    if i > 15:
+                        if letra == ",":
+                            numeros.append(int(dato))
+                            dato = ""
+                        else:
+                            dato = dato + letra
+
+                data = []
+                values = ""
+                dato = ""
+
+                data = self.read_byte_array(db_number=8, start_byte=0, count=500)
+
+                values = str(data)
+                for i, letra in enumerate(values):
+                    if i > 15:
+                        if letra == ",":
+                            numeros.append(int(dato))
+                            dato = ""
+                        else:
+                            dato = dato + letra
+
+
+                for i in range(len(numeros)):
+                    index = index + 0.0002
+                    self.time_array.append(index)
+                    numeros[i] = (numeros[i] * 58.59) - 30000
+
+                print(numeros)
+                print("Length", str(len(numeros)))
+
+                #self.time_array = self.read_dword_array(db_number=2, start_byte=0, count=num)
+                #self.force_array = self.read_real_array(db_number=1, start_byte=0, count=num)
+                #self.current_array = self.read_real_array(db_number=15, start_byte=0, count=num)
+
+
+                self.alerts.escribirAlerta("Datos obtenidos correctamente ✓")
+                self.alerts.escribirAlerta(f"Número de identificación: {self.identif}")
+
+                #print("Datos de fuerza:", self.force_array)
+                print("Datos de tiempo:", self.time_array)
+                print("Length", str(len(self.time_array)))
+                #print("Datos de corriente:", self.current_array)
 
                 ax = self.figure.add_subplot(111)
                 ax.clear()
-                ax.plot(self.time_array, self.force_array, marker="o", color="#51F564")
+                ax.plot(self.time_array, numeros, marker="o", color="#51F564")
                 ax.set_title(
                     f"Fuerza vs tiempo\n"
                     f"Tiempo de soldadura: {self.tSoldadura} ms | "
                     f"N. de muestras: {self.texto} | "
                     f"F máxima: {self.max} N \n"
                     f"Fecha: {self.fecha_formateada}"
-                    , fontweight='bold', fontsize=6, color = '#dddcde'
+                    , fontweight='bold', fontsize=6, color='#dddcde'
                 )
 
-                #ax.legend()
+                # ax.legend()
                 style_axis(ax, "", "")
                 self.canvas.draw()  # Refresca el lienzo
 
-                ax2 = self.figure2.add_subplot(111)
-                ax2.clear()
-                ax2.plot(self.time_array, self.current_array, marker="o", color="#FA4141")
-                ax2.set_title(
-                    f"Corriente vs tiempo\n"
-                    f"Tiempo de soldadura: {self.tSoldadura} ms | "
-                    f"N. de muestras: {self.texto} | "
-                    f"I máxima: {self.maxcurr} A \n"
-                    f"Fecha: {self.fecha_formateada}"
-                    , fontweight='bold', fontsize=6, color = '#dddcde'
-                )
-                #ax2.legend()
-                style_axis(ax2, "", "")
-                self.canvas2.draw()  # Refresca el lienzo
-
-                self.alerts.escribirAlerta("Datos obtenidos correctamente ✓")
-                self.alerts.escribirAlerta(f"Número de identificación: {self.identif}")
-
-                # print("Datos de fuerza:", self.force_array)
-                # print("Datos de tiempo:", self.time_array)
-                # print("Datos de corriente:", self.current_array)
 
 
             except Exception as e:
-                self.alerts.escribirAlerta("Error. Error al solicitar datos: " + str(e))
+                print("Error. Error al solicitar datos: " + str(e))
 
         else:
             self.alerts.escribirAlerta("Error. Tarjeta de adquisición de datos no conectada.")
