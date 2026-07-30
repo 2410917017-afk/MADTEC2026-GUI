@@ -36,13 +36,17 @@ MADTEC2026-GUI/
 │       │   └── AlertLog.py           # Widget de alertas
 │       ├── utils/
 │       │   ├── plotting.py           # Funciones de graficación
-│       │   ├── QRCodes/             # Códigos QR generados
+│       │   ├── QRCodes/              # Códigos QR generados
 │       │   └── ...
 │       └── __init__.py
 │
 ├── packaging/                        # Scripts de compilación
 │   ├── build_hmi.sh                 # Script para PyInstaller
 │   └── README_HMI.md                # Documentación de packaging
+│
+├── PLC Siemens S7-1200/             # Código para PLC
+│
+├── Tarjeta DAQ  (PIC18F4550)/       # Código para tarjeta PIC y diagrama electrónico
 │
 ├── CAD/                             # Modelos 3D y planos (si aplica)
 ├── docs/                            # Documentación adicional
