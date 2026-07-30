@@ -1,11 +1,11 @@
 # Guía: Instalación de SonyILX Library para Python en Ubuntu Linux
 
-## 📋 Resumen del Proyecto
+##  Resumen del Proyecto
 La **SonyILX Library** es una librería Python + C++ que proporciona un wrapper para las cámaras Sony Remote SDK (como Sony ILX-LR1). Se distribuye como módulo de extensión Python compilado con `pybind11`.
 
 ---
 
-## ✅ Requisitos Previos en Ubuntu
+##  Requisitos Previos en Ubuntu
 
 ### 1. **Dependencias del Sistema**
 ```bash
@@ -32,7 +32,7 @@ source ~/miniconda3/bin/activate
 
 ---
 
-## 🚀 Pasos de Instalación (COMPLETOS Y VERIFICADOS)
+##  Pasos de Instalación (COMPLETOS Y VERIFICADOS)
 
 ### **Paso 1: Crear Entorno Conda**
 ```bash
@@ -50,7 +50,7 @@ conda install -c conda-forge \
   scikit-build-core
 ```
 
-### **Paso 3: Copiar Librerías Compiladas del Sony SDK** ⚠️ **IMPORTANTE**
+### **Paso 3: Copiar Librerías Compiladas del Sony SDK**  **IMPORTANTE**
 Las librerías compiladas del Sony SDK NO están incluidas en el repositorio. Se encuentran en `PAQUETES SDK/`. Cópialas:
 
 ```bash
@@ -108,7 +108,7 @@ python -c "import sys, sonyilx_camera; print('✓ Python:', sys.executable); pri
 ✓ Módulo: /home/cetevi/miniconda3/lib/python3.13/site-packages/sonyilx_camera.cpython-313-x86_64-linux-gnu.so
 ```
 
-### **Paso 6: Crear Enlaces Simbólicos del Runtime Sony SDK** ⚠️ **CRÍTICO**
+### **Paso 6: Crear Enlaces Simbólicos del Runtime Sony SDK**  **CRÍTICO**
 El SDK Sony busca archivos de configuración en directorios específicos. Crea estos enlaces:
 
 ```bash
@@ -149,9 +149,9 @@ Desconecta y reconecta la cámara después de esto.
 
 ---
 
-## 🧪 Pruebas de Funcionalidad
+##  Pruebas de Funcionalidad
 
-### **Prueba 1: Enumeración de Cámaras** ✅ VERIFICADA
+### **Prueba 1: Enumeración de Cámaras**  VERIFICADA
 ```bash
 python -c "import sonyilx_camera as ilx; print(ilx.debug_enumerate_cameras())"
 ```
@@ -231,7 +231,7 @@ python -m pytest
 
 ---
 
-## 📚 API Principal de Python
+##  API Principal de Python
 
 Una vez instalado, puedes usar la librería así:
 
@@ -259,7 +259,7 @@ camera = ilx.CameraLibrary()
 
 ---
 
-## ⚠️ Solución de Problemas
+##  Solución de Problemas
 
 ### **Problema: "ModuleNotFoundError: No module named 'sonyilx_camera'"**
 ```bash
@@ -302,7 +302,7 @@ python -m pip install --force-reinstall --no-cache-dir --verbose .
 
 ---
 
-## 💾 Usar la Librería en Proyectos Independientes
+##  Usar la Librería en Proyectos Independientes
 
 Una vez instalada, en **cualquier script Python**:
 
@@ -358,34 +358,34 @@ if __name__ == "__main__":
 
 ---
 
-## 📝 Resumen Rápido (Pasos Finales Verificados)
+##  Resumen Rápido (Pasos Finales Verificados)
 
 | # | Paso | Comando | Estado |
 |---|------|---------|--------|
-| 1 | Crear entorno | `conda create -n sonyilx python=3.10` | ✅ |
-| 2 | Activar entorno | `conda activate sonyilx` | ✅ |
-| 3 | Instalar herramientas | `conda install -c conda-forge cmake ninja pip pybind11 scikit-build-core` | ✅ |
-| 4 | **Copiar librerías SDK** | `cp $CRSDK_PATH/RemoteCli/external/crsdk/*.so $TARGET_DIR/` | ✅ **CRÍTICO** |
-| 5 | Compilar e instalar | `cd SonyILXLibrary && pip install .` | ✅ |
-| 6 | Crear enlaces simbólicos | Script de enlaces (ver Paso 6 arriba) | ✅ |
-| 7 | Probar instalación | `python -c "import sonyilx_camera as ilx; print(ilx.debug_enumerate_cameras())"` | ✅ |
+| 1 | Crear entorno | `conda create -n sonyilx python=3.10` |
+| 2 | Activar entorno | `conda activate sonyilx` | 
+| 3 | Instalar herramientas | `conda install -c conda-forge cmake ninja pip pybind11 scikit-build-core` | 
+| 4 | **Copiar librerías SDK** | `cp $CRSDK_PATH/RemoteCli/external/crsdk/*.so $TARGET_DIR/` |  **CRÍTICO** |
+| 5 | Compilar e instalar | `cd SonyILXLibrary && pip install .` | 
+| 6 | Crear enlaces simbólicos | Script de enlaces (ver Paso 6 arriba) | 
+| 7 | Probar instalación | `python -c "import sonyilx_camera as ilx; print(ilx.debug_enumerate_cameras())"` | 
 
 ---
 
-## 🎯 Estado Actual
+##  Estado Actual
 
-✅ **¡Librería Lista para Usar!**
+ **¡Librería Lista para Usar!**
 
-- ✅ Módulo compilado e instalado
-- ✅ Enlaces simbólicos del SDK Sony configurados
-- ✅ Enumeración de cámaras funcional
-- ✅ API de Python accesible
+-  Módulo compilado e instalado
+-  Enlaces simbólicos del SDK Sony configurados
+-  Enumeración de cámaras funcional
+-  API de Python accesible
 
 Puedes empezar a usar `sonyilx_camera` en tus scripts Python en cualquier momento.
 
 ---
 
-## 🔗 Recursos Útiles
+##  Recursos Útiles
 - **Documentación Python API**: Ver sección "Python API" en README.md del proyecto
 - **Calibración de Cámara**: Ver sección "Image Processing, Calculation, and Measurements"
 - **Tests**: `python -m pytest --help` para más opciones
