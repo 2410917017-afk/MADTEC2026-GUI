@@ -29,8 +29,8 @@ MADTEC2026-GUI/
 │       ├── app.py                    # Clase principal HMI (PyQt5)
 │       ├── config.py                 # Configuración (URLs, IPs, puertos)
 │       ├── services/
-│       │   ├── api_client.py        # Cliente HTTP para API backend
-│       │   ├── plc.py               # Interfaz Snap7 con PLC
+│       │   ├── api_client.py         # Cliente HTTP para API backend
+│       │   ├── plc.py                # Interfaz Snap7 con PLC
 │       │   └── ...
 │       ├── widgets/                  # Componentes UI personalizados
 │       │   └── AlertLog.py           # Widget de alertas
@@ -41,18 +41,19 @@ MADTEC2026-GUI/
 │       └── __init__.py
 │
 ├── packaging/                        # Scripts de compilación
-│   ├── build_hmi.sh                 # Script para PyInstaller
-│   └── README_HMI.md                # Documentación de packaging
+│   ├── build_hmi.sh                  # Script para PyInstaller
+│   └── README_HMI.md                 # Documentación de packaging
 │
-├── PLC Siemens S7-1200/             # Código para PLC
+├── others/  
+│   ├── robot_program                 # Modulo implementado en la programación de robor ABB
+│   ├── PLC Siemens S7-1200/          # Código para PLC
+│   └── Tarjeta DAQ  (PIC18F4550)/    # Código para tarjeta PIC y diagrama electrónico
 │
-├── Tarjeta DAQ  (PIC18F4550)/       # Código para tarjeta PIC y diagrama electrónico
-│
-├── CAD/                             # Modelos 3D y planos (si aplica)
-├── docs/                            # Documentación adicional
-├── requirements.txt                 # Dependencias Python
+├── CAD/                              # Modelos 3D y planos (si aplica)
+├── docs/                             # Documentación adicional
+├── requirements.txt                  # Dependencias Python
 ├── .gitignore
-└── README.md                        # Este archivo
+└── README.md                         # Este archivo
 ```
 
 ---

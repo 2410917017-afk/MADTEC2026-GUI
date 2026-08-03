@@ -1,0 +1,142 @@
+MODULE Alejandro
+    
+    
+    CONST robtarget Target_11:=[[1745.94,-32.23,1026.58],[0,0,1,0],[-1,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget Target_21:=[[1997.13,-32.24,1026.58],[0,0,1,0],[-1,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget Target_31:=[[1997.12,-32.24,1039.72],[0, 0, 1, 0],[-1,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+
+    CONST robtarget Target_31_2:=[[1997.120055206,-32.2399986,1039.719970302],[0.000000021,0.000000006,0.976296007,-0.216439613],[-1,0,-1,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget Target_31_5:=[[1997.12,-32.24,1039.72],[0.130526195,0,0.991444861,0],[-1,0,-1,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget Target_31_4:=[[1997.120020471,-32.240005294,1039.719899879],[0.216439597,-0.00000003,-0.976296011,-0.000000013],[-1,-1,-1,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget Target_31_3:=[[1997.120018835,-32.240002388,1039.719984955],[-0.000000005,0.000000001,0.976296007,0.216439613],[-1,0,-1,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    
+    VAR intnum int_paro_di;
+    VAR intnum int_pos0_di;
+    VAR intnum int_pos1_di;
+    VAR intnum int_pos2_di;
+    VAR intnum int_pos3_di;
+    VAR intnum int_pos4_di;
+    
+    
+    TASK PERS tooldata spot_welder1:=[TRUE,[[-212.697,0.190085,187.202],[1,0,0,0]],[5,[10,0,10],[1,0,0,0],0.1,0.1,0.1]];
+
+    
+    TRAP rutina_paro
+        
+        StopMove; ! Detener todos los movimientos del robot de inmediato
+        
+        StorePath; ! Guardar la ruta actual 
+        
+        TPWrite "Robot detenido por HMI"; ! Indicar en pantalla que hubo un paro
+        
+        TPWrite "Por favor confirme para reanudar";
+        WaitDI diRestart, 1; ! Esperar confirmación del PLC antes de continuar
+        TPWrite "Reanudar movimiento";
+        
+        RestoPath; ! Restaurar y reanudar los movimientos
+        StartMove;
+        
+    ENDTRAP
+    
+    TRAP rutina_pos0
+        
+        Path_11;
+        MoveL Target_31,v10,z100,spot_welder1\WObj:=wobj0;
+        PulseDO \PLength:=1, doReady; ! pulso de 0.5 s      
+        
+        WaitDI diFinish, 1; ! Señal para regresar a Home
+        Path_21; ! Ejecuta camino hacia Home
+        
+        PulseDO \PLength:=1, doHome;
+        
+    ENDTRAP
+    
+    TRAP rutina_pos1
+        
+        Path_11;
+        MoveL Target_31_2,v1000,z100,spot_welder1\WObj:=wobj0;
+        PulseDO \PLength:=1, doReady; ! pulso de 0.5 s      
+        
+        WaitDI diFinish, 1; ! Señal para regresar a Home
+        Path_21; ! Ejecuta camino hacia Home
+        
+        PulseDO \PLength:=1, doHome;
+        
+    ENDTRAP
+    
+    TRAP rutina_pos2
+        
+        Path_11;
+        MoveL Target_31_3,v1000,z100,spot_welder1\WObj:=wobj0;
+        PulseDO \PLength:=1, doReady; ! pulso de 0.5 s      
+        
+        WaitDI diFinish, 1; ! Señal para regresar a Home
+        Path_21; ! Ejecuta camino hacia Home
+        
+        PulseDO \PLength:=1, doHome;
+        
+    ENDTRAP
+    
+    TRAP rutina_pos3
+        
+        Path_11;
+        MoveL Target_31_4,v1000,z100,spot_welder1\WObj:=wobj0;
+        PulseDO \PLength:=1, doReady; ! pulso de 0.5 s      
+        
+        WaitDI diFinish, 1; ! Señal para regresar a Home
+        Path_21; ! Ejecuta camino hacia Home
+        
+        PulseDO \PLength:=1, doHome;
+        
+    ENDTRAP
+    
+    TRAP rutina_pos4
+        
+        Path_11;
+        MoveL Target_31_5,v1000,z100,spot_welder1\WObj:=wobj0;
+        PulseDO \PLength:=1, doReady; ! pulso de 0.5 s      
+        
+        WaitDI diFinish, 1; ! Señal para regresar a Home
+        Path_21; ! Ejecuta camino hacia Home
+        
+        PulseDO \PLength:=1, doHome;
+        
+    ENDTRAP
+        
+    
+    PROC soldadura()
+        
+        CONNECT int_paro_di WITH rutina_paro;
+        CONNECT int_pos0_di WITH rutina_pos0;
+        CONNECT int_pos1_di WITH rutina_pos1;
+        CONNECT int_pos2_di WITH rutina_pos2;
+        CONNECT int_pos3_di WITH rutina_pos3;
+        CONNECT int_pos4_di WITH rutina_pos4;
+        
+        ISignalDI diStop, 1, int_paro_di; ! Designar entrada de paro a rutina de paro
+        ISignalDI diStart, 1, int_pos0_di;
+        ISignalDI diPos1, 1, int_pos1_di;
+        ISignalDI diPos2, 1, int_pos2_di;
+        ISignalDI diPos3, 1, int_pos3_di;
+        ISignalDI diPos4, 1, int_pos4_di;
+        
+        PulseDO \PLength:=1, doHome;
+        
+        WHILE TRUE DO
+            WaitTime 0.5;
+        ENDWHILE
+
+    ENDPROC
+    
+    
+    LOCAL PROC Path_11()
+        MoveL Target_11,v10,z100,spot_welder1\WObj:=wobj0;
+        MoveL Target_21,v20,z100,spot_welder1\WObj:=wobj0;
+    ENDPROC
+    LOCAL PROC Path_21()
+        MoveL Target_21,v10,z100,spot_welder1\WObj:=wobj0;
+        MoveL Target_11,v20,z100,spot_welder1\WObj:=wobj0;
+    ENDPROC
+    
+
+ENDMODULE
