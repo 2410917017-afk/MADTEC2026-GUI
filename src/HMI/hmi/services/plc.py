@@ -11,6 +11,9 @@ def read_int_array(plc, db_number, start_byte, count):
     data = plc.db_read(db_number, start_byte, size=count * 2)
     return [get_int(data, index * 2) for index in range(count)]
 
+def read_byte_array(plc, db_number, start_byte, count):
+    data = plc.db_read(db_number, start_byte, size=count)
+    return data
 
 def read_dword_array(plc, db_number, start_byte, count):
     data = plc.db_read(db_number, start_byte, size=count * 4)

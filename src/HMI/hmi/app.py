@@ -33,6 +33,7 @@ from hmi.services.plc import (
     read_dword_array as plc_read_dword_array,
     read_int_array as plc_read_int_array,
     read_real_array as plc_read_real_array,
+    read_byte_array as plc_read_byte_array,
     write_bool as plc_write_bool,
     write_int as plc_write_int,
 )
@@ -146,6 +147,7 @@ class HMI(QMainWindow):
         self.mat3 = ""
         self.force_array = []
         self.time_array = []
+        self.time2_array = []
         self.current_array = []
         self.fecha_formateada = ahora.strftime("%d-%m-%Y-%H-%M-%S")
 
@@ -208,7 +210,7 @@ class HMI(QMainWindow):
                                   }
                                   """)
         self.buttonstart.clicked.connect(self.actualizar_nombre)  # Llamada a funciones que ejecutan el comportamiento de botones
-        self.buttonstart.clicked.connect(self.iniciar_PLC)
+        self.buttonstart.clicked.connect(self.show_plot)
 
         self.buttonconnect = QPushButton("Conectar")
         self.buttonconnect.setFont(QFont("Arial", 20))
@@ -732,6 +734,9 @@ class HMI(QMainWindow):
     def read_int_array(self, db_number, start_byte, count):
         return plc_read_int_array(self.plc, db_number, start_byte, count)
 
+    def read_byte_array(self, db_number, start_byte, count):
+        return plc_read_byte_array(self.plc, db_number, start_byte, count)
+
     def read_dword_array(self, db_number, start_byte, count):
         return plc_read_dword_array(self.plc, db_number, start_byte, count)
 
@@ -772,8 +777,6 @@ class HMI(QMainWindow):
                     self.buscarid(data)
                     time.sleep(2)
                     self.setParams()
-
-                    self.iniciar_PLC()
 
 
                 rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -1003,16 +1006,15 @@ class HMI(QMainWindow):
             self.alerts.escribirAlerta("Error. Error al conectar PLC: " + str(e))
 
         try:
-            self.camera.initialize()
-            self.camera.connect_camera()
+            #self.camera.initialize()
+            #self.camera.connect_camera()
 
             time.sleep(2)
             if self.camera.is_connected():
                 self.timer.timeout.connect(self.update_frame)
                 self.timer.start(30)
                 self.zoom = self.camera.zoom_position()
-                #print(self.zoom)
-                #print(self.camera.zoom_position_minimum(), "-", self.camera.zoom_position_maximum())
+
 
                 self.alerts.escribirAlerta("Conectado a cámara.")
 
@@ -1186,6 +1188,73 @@ class HMI(QMainWindow):
                 self.max = 0
                 self.maxcurr = 0
                 num = self.texto
+                data = []
+                values = ""
+                dato = ""
+
+                index = -0.0002
+                data = self.read_byte_array(db_number=15, start_byte=0, count=500)
+
+                values = str(data)
+                for i, letra in enumerate(values):
+                    if i > 15:
+                        if letra == ",":
+                            self.current_array.append(int(dato))
+                            dato = ""
+                        else:
+                            dato = dato + letra
+
+                data = []
+                values = ""
+                dato = ""
+
+                data = self.read_byte_array(db_number=20, start_byte=0, count=500)
+
+                values = str(data)
+                for i, letra in enumerate(values):
+                    if i > 15:
+                        if letra == ",":
+                            self.current_array.append(int(dato))
+                            dato = ""
+                        else:
+                            dato = dato + letra
+
+                data = []
+                values = ""
+                dato = ""
+
+                data = self.read_byte_array(db_number=21, start_byte=0, count=500)
+
+                values = str(data)
+                for i, letra in enumerate(values):
+                    if i > 15:
+                        if letra == ",":
+                            self.current_array.append(int(dato))
+                            dato = ""
+                        else:
+                            dato = dato + letra
+
+                data = []
+                values = ""
+                dato = ""
+
+                data = self.read_byte_array(db_number=24, start_byte=0, count=500)
+
+                values = str(data)
+                for i, letra in enumerate(values):
+                    if i > 15:
+                        if letra == ",":
+                            self.current_array.append(int(dato))
+                            dato = ""
+                        else:
+                            dato = dato + letra
+
+
+                for i in range(len(self.current_array)):
+                    index = index + 0.0002
+                    self.time2_array.append(index)
+                    self.current_array[i] = (self.current_array[i] * 58.59) - 30170
+
 
                 self.figure.clear()
                 self.figure2.clear()
@@ -1193,7 +1262,7 @@ class HMI(QMainWindow):
 
                 self.time_array = self.read_dword_array(db_number=13, start_byte=0, count=num)
                 self.force_array = self.read_real_array(db_number=1, start_byte=0, count=num)
-                self.current_array = self.read_real_array(db_number=15, start_byte=0, count=num)
+
 
                 if len(self.time_array) and len(self.force_array) > 5:
                     for i in range(len(self.force_array)):
@@ -1226,7 +1295,7 @@ class HMI(QMainWindow):
 
                 ax2 = self.figure2.add_subplot(111)
                 ax2.clear()
-                ax2.plot(self.time_array, self.current_array, marker="o", color="#FA4141")
+                ax2.plot(self.time2_array, self.current_array, marker="o", color="#FA4141")
                 ax2.set_title(
                     f"Corriente vs tiempo\n"
                     f"Tiempo de soldadura: {self.tSoldadura} ms | "
